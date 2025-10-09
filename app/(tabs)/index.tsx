@@ -9,13 +9,14 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase, Workout } from '@/lib/supabase';
+import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { Calendar, TrendingUp, Target, Clock } from 'lucide-react-native';
 
 export default function Home() {
   const { profile, isPremium } = useAuth();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [cycles, setCycles] = useState<Cycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -28,7 +29,7 @@ export default function Home() {
   const fetchWorkouts = async () => {
     if (!profile) return;
 
-    const [recentWorkouts, allWorkouts] = await Promise.all([
+    const [recentWorkouts, allWorkouts, cyclesData] = await Promise.all([
       supabase
         .from('workouts')
         .select('*')
@@ -38,7 +39,14 @@ export default function Home() {
       supabase
         .from('workouts')
         .select('*')
+        .eq('user_id', profile.id),
+      supabase
+        .from('cycles')
+        .select('*')
         .eq('user_id', profile.id)
+        .order('is_active', { ascending: false })
+        .order('start_date', { ascending: false })
+        .limit(3),
     ]);
 
     if (recentWorkouts.data) {
@@ -47,6 +55,10 @@ export default function Home() {
 
     if (allWorkouts.data) {
       calculateStats(allWorkouts.data);
+    }
+
+    if (cyclesData.data) {
+      setCycles(cyclesData.data);
     }
   };
 
@@ -104,6 +116,23 @@ export default function Home() {
     });
   };
 
+  const formatCycleDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getCycleProgress = (cycle: Cycle) => {
+    const now = new Date();
+    const start = new Date(cycle.start_date);
+    const end = new Date(cycle.end_date);
+    const total = end.getTime() - start.getTime();
+    const elapsed = now.getTime() - start.getTime();
+    return Math.min(Math.max((elapsed / total) * 100, 0), 100);
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -150,6 +179,41 @@ export default function Home() {
           <Text style={styles.statLabel}>Avg Intensity</Text>
         </View>
       </View>
+
+      {cycles.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Training Cycles</Text>
+          {cycles.map((cycle) => (
+            <View key={cycle.id} style={[styles.cycleCard, cycle.is_active && styles.cycleCardActive]}>
+              <View style={styles.cycleHeader}>
+                <Text style={styles.cycleName}>{cycle.name}</Text>
+                {cycle.is_active && (
+                  <View style={styles.activeBadge}>
+                    <Text style={styles.activeBadgeText}>ACTIVE</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.cycleType}>
+                {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
+              </Text>
+              <Text style={styles.cycleDates}>
+                {formatCycleDate(cycle.start_date)} - {formatCycleDate(cycle.end_date)}
+              </Text>
+              {cycle.description && (
+                <Text style={styles.cycleDescription} numberOfLines={2}>
+                  {cycle.description}
+                </Text>
+              )}
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${getCycleProgress(cycle)}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {Math.round(getCycleProgress(cycle))}% complete
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Workouts</Text>
@@ -319,5 +383,74 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  cycleCard: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  cycleCardActive: {
+    borderColor: '#2A7DE1',
+  },
+  cycleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cycleName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    flex: 1,
+  },
+  activeBadge: {
+    backgroundColor: '#2A7DE1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  activeBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  cycleType: {
+    fontSize: 14,
+    color: '#2A7DE1',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  cycleDates: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 8,
+  },
+  cycleDescription: {
+    fontSize: 14,
+    color: '#CCC',
+    fontStyle: 'italic',
+    marginBottom: 12,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#2A7DE1',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#2A7DE1',
+    marginTop: 4,
+    fontWeight: '600',
   },
 });
