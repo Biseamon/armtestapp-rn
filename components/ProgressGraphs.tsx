@@ -18,6 +18,8 @@ export function ProgressGraphs({ workouts, strengthTests }: ProgressGraphsProps)
   const { isPremium } = useAuth();
   const [showPaywall, setShowPaywall] = useState(false);
 
+  console.log('ProgressGraphs rendering with', workouts.length, 'workouts');
+
   const getLast7DaysWorkouts = () => {
     const last7Days = [];
     const now = new Date();
@@ -246,21 +248,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A',
     borderRadius: 16,
     padding: 20,
-    position: 'relative',
+    position: 'relative' as const,
   },
   lockedCard: {
     opacity: 0.7,
   },
   lockOverlay: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(26, 26, 26, 0.9)',
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
     zIndex: 10,
   },
   lockText: {
@@ -286,21 +288,21 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   barChart: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     height: GRAPH_HEIGHT,
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
+    alignItems: 'flex-end' as const,
+    justifyContent: 'space-around' as const,
   },
   barContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    alignItems: 'center' as const,
+    justifyContent: 'flex-end' as const,
   },
   barWrapper: {
     width: '80%',
     height: GRAPH_HEIGHT,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    justifyContent: 'flex-end' as const,
+    alignItems: 'center' as const,
   },
   bar: {
     width: '100%',
@@ -308,8 +310,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
     minHeight: 4,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
+    justifyContent: 'flex-start' as const,
+    alignItems: 'center' as const,
     paddingTop: 4,
   },
   barLabel: {
@@ -326,8 +328,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   pieItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 12,
   },
   pieColor: {
@@ -342,12 +344,12 @@ const styles = StyleSheet.create({
   lineChart: {
     height: GRAPH_HEIGHT,
     width: GRAPH_WIDTH,
-    position: 'relative',
+    position: 'relative' as const,
     backgroundColor: '#1A1A1A',
     borderRadius: 8,
   },
   dataPoint: {
-    position: 'absolute',
+    position: 'absolute' as const,
     width: 8,
     height: 8,
   },
@@ -361,9 +363,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   strengthItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
@@ -374,8 +376,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   strengthValues: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 12,
   },
   strengthValue: {
@@ -395,8 +397,8 @@ const styles = StyleSheet.create({
   },
   blurredChart: {
     height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
     backgroundColor: '#1A1A1A',
     borderRadius: 8,
   },
