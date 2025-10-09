@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,16 @@ import {
   TextInput,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase, Goal, StrengthTest, Workout } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
 import { ProgressGraphs } from '@/components/ProgressGraphs';
-import { Plus, Target, X, Save, Trophy, TrendingUp } from 'lucide-react-native';
+import { Plus, Target, X, Save, Trophy, TrendingUp, Calendar } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 
@@ -30,15 +33,20 @@ export default function Progress() {
 
   const [goalType, setGoalType] = useState('');
   const [targetValue, setTargetValue] = useState('');
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
 
   const [testType, setTestType] = useState('max_wrist_curl');
   const [testResult, setTestResult] = useState('');
   const [testNotes, setTestNotes] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, [profile]);
+  useFocusEffect(
+    useCallback(() => {
+      if (profile) {
+        fetchData();
+      }
+    }, [profile])
+  );
 
   const fetchData = async () => {
     if (!profile) return;
@@ -84,14 +92,14 @@ export default function Progress() {
       user_id: profile.id,
       goal_type: goalType,
       target_value: parseInt(targetValue),
-      deadline: deadline || null,
+      deadline: deadline.toISOString().split('T')[0],
       current_value: 0,
       is_completed: false,
     });
 
     setGoalType('');
     setTargetValue('');
-    setDeadline('');
+    setDeadline(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
     setShowGoalModal(false);
     fetchData();
   };
@@ -283,14 +291,33 @@ export default function Progress() {
               placeholderTextColor="#666"
             />
 
-            <Text style={styles.label}>Deadline (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={deadline}
-              onChangeText={setDeadline}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#666"
-            />
+            <Text style={styles.label}>Deadline</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDeadlinePicker(true)}
+            >
+              <Text style={styles.dateButtonText}>
+                {deadline.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+              <Calendar size={20} color="#999" />
+            </TouchableOpacity>
+            {showDeadlinePicker && (
+              <DateTimePicker
+                value={deadline}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowDeadlinePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setDeadline(selectedDate);
+                  }
+                }}
+              />
+            )}
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveGoal}>
               <Save size={20} color="#FFF" />
@@ -603,5 +630,19 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  dateButton: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#FFF',
   },
 });

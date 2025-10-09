@@ -8,13 +8,15 @@ import {
   TextInput,
   Modal,
   Alert,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
-import { Plus, X, Save, Edit2, Trash2, Calendar } from 'lucide-react-native';
+import { Plus, X, Save, Edit2, Trash2, Calendar as CalendarIcon } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 type Exercise = {
   exercise_name: string;
@@ -45,8 +47,10 @@ export default function Training() {
   const [cycleName, setCycleName] = useState('');
   const [cycleType, setCycleType] = useState('competition_prep');
   const [cycleDescription, setCycleDescription] = useState('');
-  const [cycleStartDate, setCycleStartDate] = useState('');
-  const [cycleEndDate, setCycleEndDate] = useState('');
+  const [cycleStartDate, setCycleStartDate] = useState(new Date());
+  const [cycleEndDate, setCycleEndDate] = useState(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -204,15 +208,15 @@ export default function Training() {
   };
 
   const handleSaveCycle = async () => {
-    if (!profile || !cycleName || !cycleStartDate || !cycleEndDate) return;
+    if (!profile || !cycleName) return;
 
     await supabase.from('cycles').insert({
       user_id: profile.id,
       name: cycleName,
       description: cycleDescription,
       cycle_type: cycleType,
-      start_date: cycleStartDate,
-      end_date: cycleEndDate,
+      start_date: cycleStartDate.toISOString().split('T')[0],
+      end_date: cycleEndDate.toISOString().split('T')[0],
       is_active: false,
     });
 
@@ -260,8 +264,8 @@ export default function Training() {
     setCycleName('');
     setCycleType('competition_prep');
     setCycleDescription('');
-    setCycleStartDate('');
-    setCycleEndDate('');
+    setCycleStartDate(new Date());
+    setCycleEndDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
   };
 
   const workoutTypes = [
@@ -297,7 +301,7 @@ export default function Training() {
             style={[styles.addButton, styles.cycleButton]}
             onPress={() => setShowCycleModal(true)}
           >
-            <Calendar size={20} color="#FFF" />
+            <CalendarIcon size={20} color="#FFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={handleStartWorkout}>
             <Plus size={24} color="#FFF" />
@@ -655,23 +659,61 @@ export default function Training() {
               ))}
             </View>
 
-            <Text style={styles.label}>Start Date (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              value={cycleStartDate}
-              onChangeText={setCycleStartDate}
-              placeholder="2025-01-01"
-              placeholderTextColor="#666"
-            />
+            <Text style={styles.label}>Start Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowStartDatePicker(true)}
+            >
+              <Text style={styles.dateButtonText}>
+                {cycleStartDate.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+              <CalendarIcon size={20} color="#999" />
+            </TouchableOpacity>
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={cycleStartDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowStartDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setCycleStartDate(selectedDate);
+                  }
+                }}
+              />
+            )}
 
-            <Text style={styles.label}>End Date (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              value={cycleEndDate}
-              onChangeText={setCycleEndDate}
-              placeholder="2025-04-01"
-              placeholderTextColor="#666"
-            />
+            <Text style={styles.label}>End Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowEndDatePicker(true)}
+            >
+              <Text style={styles.dateButtonText}>
+                {cycleEndDate.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+              <CalendarIcon size={20} color="#999" />
+            </TouchableOpacity>
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={cycleEndDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowEndDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setCycleEndDate(selectedDate);
+                  }
+                }}
+              />
+            )}
 
             <Text style={styles.label}>Description (Optional)</Text>
             <TextInput
@@ -1036,5 +1078,19 @@ const styles = StyleSheet.create({
   },
   modalBottomSpacing: {
     height: 40,
+  },
+  dateButton: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#FFF',
   },
 });
