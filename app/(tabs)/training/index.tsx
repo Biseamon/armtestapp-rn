@@ -39,6 +39,7 @@ export default function Training() {
   const [workoutCount, setWorkoutCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [editingCycle, setEditingCycle] = useState<Cycle | null>(null);
 
   const [workoutType, setWorkoutType] = useState('table_practice');
   const [duration, setDuration] = useState('30');
@@ -210,21 +211,48 @@ export default function Training() {
     fetchData();
   };
 
+  const handleAddCycle = () => {
+    setEditingCycle(null);
+    resetCycleForm();
+    setShowCycleModal(true);
+  };
+
+  const handleEditCycle = (cycle: Cycle) => {
+    setEditingCycle(cycle);
+    setCycleName(cycle.name);
+    setCycleType(cycle.cycle_type);
+    setCycleDescription(cycle.description || '');
+    setCycleStartDate(new Date(cycle.start_date));
+    setCycleEndDate(new Date(cycle.end_date));
+    setShowCycleModal(true);
+  };
+
   const handleSaveCycle = async () => {
     if (!profile || !cycleName) return;
 
-    await supabase.from('cycles').insert({
-      user_id: profile.id,
-      name: cycleName,
-      description: cycleDescription,
-      cycle_type: cycleType,
-      start_date: cycleStartDate.toISOString().split('T')[0],
-      end_date: cycleEndDate.toISOString().split('T')[0],
-      is_active: false,
-    });
+    if (editingCycle) {
+      await supabase.from('cycles').update({
+        name: cycleName,
+        description: cycleDescription,
+        cycle_type: cycleType,
+        start_date: cycleStartDate.toISOString().split('T')[0],
+        end_date: cycleEndDate.toISOString().split('T')[0],
+      }).eq('id', editingCycle.id);
+    } else {
+      await supabase.from('cycles').insert({
+        user_id: profile.id,
+        name: cycleName,
+        description: cycleDescription,
+        cycle_type: cycleType,
+        start_date: cycleStartDate.toISOString().split('T')[0],
+        end_date: cycleEndDate.toISOString().split('T')[0],
+        is_active: false,
+      });
+    }
 
     setShowCycleModal(false);
     resetCycleForm();
+    setEditingCycle(null);
     fetchData();
   };
 
@@ -269,6 +297,7 @@ export default function Training() {
     setCycleDescription('');
     setCycleStartDate(new Date());
     setCycleEndDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
+    setEditingCycle(null);
   };
 
   const workoutTypes = [
@@ -302,7 +331,7 @@ export default function Training() {
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={[styles.addButton, styles.cycleButton]}
-            onPress={() => setShowCycleModal(true)}
+            onPress={handleAddCycle}
           >
             <CalendarIcon size={20} color="#FFF" />
           </TouchableOpacity>
@@ -319,35 +348,49 @@ export default function Training() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Training Cycles</Text>
             {cycles.map((cycle) => (
-              <TouchableOpacity
-                key={cycle.id}
-                style={[styles.cycleCard, cycle.is_active && styles.cycleCardActive]}
-                onPress={() => router.push({
-                  pathname: '/(tabs)/training/cycle-details',
-                  params: { cycleId: cycle.id }
-                })}
-                onLongPress={() => handleDeleteCycle(cycle)}
-              >
-                <View style={styles.cycleHeader}>
-                  <Text style={styles.cycleName}>{cycle.name}</Text>
-                  {cycle.is_active && (
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText}>ACTIVE</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.cycleType}>
-                  {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
-                </Text>
-                <Text style={styles.cycleDates}>
-                  {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
-                </Text>
-                {cycle.description && (
-                  <Text style={styles.cycleDescription} numberOfLines={2}>
-                    {cycle.description}
+              <View key={cycle.id} style={[styles.cycleCard, cycle.is_active && styles.cycleCardActive]}>
+                <TouchableOpacity
+                  onPress={() => router.push({
+                    pathname: '/(tabs)/training/cycle-details',
+                    params: { cycleId: cycle.id }
+                  })}
+                  style={styles.cycleMainContent}
+                >
+                  <View style={styles.cycleHeader}>
+                    <Text style={styles.cycleName}>{cycle.name}</Text>
+                    {cycle.is_active && (
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText}>ACTIVE</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.cycleType}>
+                    {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
                   </Text>
-                )}
-              </TouchableOpacity>
+                  <Text style={styles.cycleDates}>
+                    {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
+                  </Text>
+                  {cycle.description && (
+                    <Text style={styles.cycleDescription} numberOfLines={2}>
+                      {cycle.description}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <View style={styles.cycleActions}>
+                  <TouchableOpacity
+                    style={styles.cycleActionButton}
+                    onPress={() => handleEditCycle(cycle)}
+                  >
+                    <Edit2 size={18} color="#2A7DE1" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cycleActionButton}
+                    onPress={() => handleDeleteCycle(cycle)}
+                  >
+                    <Trash2 size={18} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+              </View>
             ))}
           </View>
         )}
@@ -628,7 +671,9 @@ export default function Training() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Training Cycle</Text>
+            <Text style={styles.modalTitle}>
+              {editingCycle ? 'Edit Training Cycle' : 'New Training Cycle'}
+            </Text>
             <TouchableOpacity onPress={() => setShowCycleModal(false)}>
               <X size={24} color="#999" />
             </TouchableOpacity>
@@ -736,7 +781,9 @@ export default function Training() {
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveCycle}>
               <Save size={20} color="#FFF" />
-              <Text style={styles.saveButtonText}>Create Cycle</Text>
+              <Text style={styles.saveButtonText}>
+                {editingCycle ? 'Update Cycle' : 'Create Cycle'}
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.modalBottomSpacing} />
@@ -847,6 +894,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#CCC',
     fontStyle: 'italic',
+  },
+  cycleMainContent: {
+    flex: 1,
+  },
+  cycleActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  cycleActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
   },
   limitCard: {
     backgroundColor: '#2A2A2A',
