@@ -50,10 +50,35 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
   const weeklyData = getLast7DaysWorkouts();
   const maxWorkouts = Math.max(...weeklyData.map((d) => d.count), 1);
 
+  const getWorkoutsByType = (type: string) => {
+    return filteredWorkouts.filter((w) => w.workout_type === type);
+  };
+
+  const getAverageIntensityByType = (type: string) => {
+    const typeWorkouts = getWorkoutsByType(type);
+    if (typeWorkouts.length === 0) return '0';
+    const sum = typeWorkouts.reduce((acc, w) => acc + w.intensity, 0);
+    return (sum / typeWorkouts.length).toFixed(1);
+  };
+
+  const getTotalDurationByType = (type: string) => {
+    const typeWorkouts = getWorkoutsByType(type);
+    return typeWorkouts.reduce((acc, w) => acc + w.duration_minutes, 0);
+  };
+
+  const getRecentTrend = (type: string) => {
+    const typeWorkouts = getWorkoutsByType(type)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+
+    if (typeWorkouts.length < 2) return [];
+    return typeWorkouts.reverse();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.graphCard}>
-        <Text style={styles.graphTitle}>Weekly Activity (Free)</Text>
+        <Text style={styles.graphTitle}>Weekly Activity</Text>
         <Text style={styles.graphSubtitle}>Workouts per day</Text>
 
         <View style={styles.barChart}>
@@ -73,6 +98,70 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
         </View>
       </View>
 
+      <View style={styles.graphCard}>
+        <Text style={styles.graphTitle}>Training Volume by Type</Text>
+        <Text style={styles.graphSubtitle}>Total minutes per category</Text>
+
+        <View style={styles.volumeList}>
+          {['strength', 'table_practice', 'technique', 'endurance', 'sparring'].map((type) => {
+            const duration = getTotalDurationByType(type);
+            const maxDuration = Math.max(
+              ...['strength', 'table_practice', 'technique', 'endurance', 'sparring'].map(
+                (t) => getTotalDurationByType(t)
+              ),
+              1
+            );
+            const percentage = (duration / maxDuration) * 100;
+
+            return (
+              <View key={type} style={styles.volumeItem}>
+                <Text style={styles.volumeLabel}>
+                  {type.replace(/_/g, ' ')}
+                </Text>
+                <View style={styles.volumeBarContainer}>
+                  <View style={[styles.volumeBar, { width: `${percentage}%` }]} />
+                </View>
+                <Text style={styles.volumeValue}>{duration}m</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.graphCard}>
+        <Text style={styles.graphTitle}>Average Intensity by Type</Text>
+        <Text style={styles.graphSubtitle}>How hard you train</Text>
+
+        <View style={styles.intensityTypeList}>
+          {['strength', 'table_practice', 'technique', 'endurance', 'sparring'].map((type) => {
+            const avgIntensity = parseFloat(getAverageIntensityByType(type));
+            const count = getWorkoutsByType(type).length;
+
+            return (
+              <View key={type} style={styles.intensityTypeItem}>
+                <View style={styles.intensityTypeHeader}>
+                  <Text style={styles.intensityTypeLabel}>
+                    {type.replace(/_/g, ' ')}
+                  </Text>
+                  <Text style={styles.intensityTypeCount}>({count})</Text>
+                </View>
+                <View style={styles.intensityTypeBar}>
+                  <View
+                    style={[
+                      styles.intensityTypeFill,
+                      { width: `${(avgIntensity / 10) * 100}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.intensityTypeValue}>
+                  {avgIntensity > 0 ? `${avgIntensity}/10` : 'N/A'}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
       <TouchableOpacity
         style={styles.graphCard}
         onPress={() => !isPremium && setShowPaywall(true)}
@@ -82,34 +171,36 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
           <View style={styles.lockOverlay}>
             <Lock size={40} color="#FFD700" />
             <Text style={styles.lockText}>Premium Feature</Text>
-            <Text style={styles.lockSubtext}>Unlock detailed analytics</Text>
           </View>
         )}
 
-        <Text style={styles.graphTitle}>Workout Type Distribution</Text>
-        <Text style={styles.graphSubtitle}>Types of training</Text>
+        <Text style={styles.graphTitle}>Strength Training Progress</Text>
+        <Text style={styles.graphSubtitle}>Last 5 sessions</Text>
 
         {isPremium ? (
-          <View style={styles.pieChart}>
-            {Object.entries(getWorkoutTypeDistribution()).map(([type, count], index) => {
-              const total = workouts.length;
-              const percentage = ((count / total) * 100).toFixed(0);
-              const colors = ['#E63946', '#2A7DE1', '#FFD700', '#4CAF50', '#FF6B6B'];
-
-              return (
-                <View key={type} style={styles.pieItem}>
-                  <View
-                    style={[
-                      styles.pieColor,
-                      { backgroundColor: colors[index % colors.length] },
-                    ]}
-                  />
-                  <Text style={styles.pieLabel}>
-                    {type.replace(/_/g, ' ')}: {percentage}%
-                  </Text>
+          <View style={styles.trendList}>
+            {getRecentTrend('strength').length > 0 ? (
+              getRecentTrend('strength').map((workout, index) => (
+                <View key={workout.id} style={styles.trendItem}>
+                  <Text style={styles.trendIndex}>#{index + 1}</Text>
+                  <View style={styles.trendInfo}>
+                    <Text style={styles.trendDate}>
+                      {new Date(workout.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Text>
+                    <View style={styles.trendStats}>
+                      <Text style={styles.trendStat}>{workout.duration_minutes}m</Text>
+                      <Text style={styles.trendDivider}>•</Text>
+                      <Text style={styles.trendStat}>Intensity: {workout.intensity}/10</Text>
+                    </View>
+                  </View>
                 </View>
-              );
-            })}
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No strength workouts yet</Text>
+            )}
           </View>
         ) : (
           <View style={styles.blurredChart}>
@@ -118,6 +209,36 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
         )}
       </TouchableOpacity>
 
+      <View style={styles.graphCard}>
+        <Text style={styles.graphTitle}>Technique Training Progress</Text>
+        <Text style={styles.graphSubtitle}>Last 5 sessions</Text>
+
+        <View style={styles.trendList}>
+          {getRecentTrend('technique').length > 0 ? (
+            getRecentTrend('technique').map((workout, index) => (
+              <View key={workout.id} style={styles.trendItem}>
+                <Text style={styles.trendIndex}>#{index + 1}</Text>
+                <View style={styles.trendInfo}>
+                  <Text style={styles.trendDate}>
+                    {new Date(workout.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                  <View style={styles.trendStats}>
+                    <Text style={styles.trendStat}>{workout.duration_minutes}m</Text>
+                    <Text style={styles.trendDivider}>•</Text>
+                    <Text style={styles.trendStat}>Intensity: {workout.intensity}/10</Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noDataText}>No technique workouts yet</Text>
+          )}
+        </View>
+      </View>
+
       <TouchableOpacity
         style={styles.graphCard}
         onPress={() => !isPremium && setShowPaywall(true)}
@@ -130,7 +251,84 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
           </View>
         )}
 
-        <Text style={styles.graphTitle}>Intensity Trend</Text>
+        <Text style={styles.graphTitle}>Endurance Training Progress</Text>
+        <Text style={styles.graphSubtitle}>Last 5 sessions</Text>
+
+        {isPremium ? (
+          <View style={styles.trendList}>
+            {getRecentTrend('endurance').length > 0 ? (
+              getRecentTrend('endurance').map((workout, index) => (
+                <View key={workout.id} style={styles.trendItem}>
+                  <Text style={styles.trendIndex}>#{index + 1}</Text>
+                  <View style={styles.trendInfo}>
+                    <Text style={styles.trendDate}>
+                      {new Date(workout.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Text>
+                    <View style={styles.trendStats}>
+                      <Text style={styles.trendStat}>{workout.duration_minutes}m</Text>
+                      <Text style={styles.trendDivider}>•</Text>
+                      <Text style={styles.trendStat}>Intensity: {workout.intensity}/10</Text>
+                    </View>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No endurance workouts yet</Text>
+            )}
+          </View>
+        ) : (
+          <View style={styles.blurredChart}>
+            <Text style={styles.blurredText}>Premium analytics locked</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.graphCard}>
+        <Text style={styles.graphTitle}>Table Practice Progress</Text>
+        <Text style={styles.graphSubtitle}>Last 5 sessions</Text>
+
+        <View style={styles.trendList}>
+          {getRecentTrend('table_practice').length > 0 ? (
+            getRecentTrend('table_practice').map((workout, index) => (
+              <View key={workout.id} style={styles.trendItem}>
+                <Text style={styles.trendIndex}>#{index + 1}</Text>
+                <View style={styles.trendInfo}>
+                  <Text style={styles.trendDate}>
+                    {new Date(workout.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                  <View style={styles.trendStats}>
+                    <Text style={styles.trendStat}>{workout.duration_minutes}m</Text>
+                    <Text style={styles.trendDivider}>•</Text>
+                    <Text style={styles.trendStat}>Intensity: {workout.intensity}/10</Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noDataText}>No table practice workouts yet</Text>
+          )}
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={styles.graphCard}
+        onPress={() => !isPremium && setShowPaywall(true)}
+        activeOpacity={isPremium ? 1 : 0.7}
+      >
+        {!isPremium && (
+          <View style={styles.lockOverlay}>
+            <Lock size={40} color="#FFD700" />
+            <Text style={styles.lockText}>Premium Feature</Text>
+          </View>
+        )}
+
+        <Text style={styles.graphTitle}>Overall Intensity Trend</Text>
         <Text style={styles.graphSubtitle}>Last 10 workouts</Text>
 
         {isPremium ? (
@@ -306,5 +504,110 @@ const styles = StyleSheet.create({
   blurredText: {
     fontSize: 14,
     color: '#666',
+  },
+  volumeList: {
+    gap: 16,
+  },
+  volumeItem: {
+    gap: 8,
+  },
+  volumeLabel: {
+    fontSize: 14,
+    color: '#CCC',
+    textTransform: 'capitalize',
+  },
+  volumeBarContainer: {
+    height: 24,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  volumeBar: {
+    height: '100%',
+    backgroundColor: '#2A7DE1',
+  },
+  volumeValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  intensityTypeList: {
+    gap: 16,
+  },
+  intensityTypeItem: {
+    gap: 6,
+  },
+  intensityTypeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  intensityTypeLabel: {
+    fontSize: 14,
+    color: '#CCC',
+    textTransform: 'capitalize',
+  },
+  intensityTypeCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  intensityTypeBar: {
+    height: 20,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  intensityTypeFill: {
+    height: '100%',
+    backgroundColor: '#E63946',
+  },
+  intensityTypeValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  trendList: {
+    gap: 12,
+  },
+  trendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1A1A1A',
+    padding: 12,
+    borderRadius: 8,
+  },
+  trendIndex: {
+    fontSize: 12,
+    color: '#999',
+    width: 30,
+  },
+  trendInfo: {
+    flex: 1,
+  },
+  trendDate: {
+    fontSize: 14,
+    color: '#FFF',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  trendStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trendStat: {
+    fontSize: 12,
+    color: '#CCC',
+  },
+  trendDivider: {
+    fontSize: 12,
+    color: '#666',
+    marginHorizontal: 8,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    padding: 20,
   },
 });

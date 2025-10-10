@@ -5,8 +5,9 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
@@ -197,7 +198,15 @@ export default function Home() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Training Cycles</Text>
           {cycles.map((cycle) => (
-            <View key={cycle.id} style={[styles.cycleCard, { backgroundColor: colors.surface, borderColor: cycle.is_active ? colors.secondary : 'transparent' }]}>
+            <TouchableOpacity
+              key={cycle.id}
+              style={[styles.cycleCard, { backgroundColor: colors.surface, borderColor: cycle.is_active ? colors.secondary : 'transparent' }]}
+              onPress={() => router.push({
+                pathname: '/(tabs)/training/cycle-details',
+                params: { cycleId: cycle.id }
+              })}
+              activeOpacity={0.7}
+            >
               <View style={styles.cycleHeader}>
                 <Text style={[styles.cycleName, { color: colors.text }]}>{cycle.name}</Text>
                 {cycle.is_active && (
@@ -223,7 +232,7 @@ export default function Home() {
               <Text style={[styles.progressText, { color: colors.secondary }]}>
                 {Math.round(getCycleProgress(cycle))}% complete
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}

@@ -13,10 +13,18 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { supabase, Workout, Cycle, Exercise } from '@/lib/supabase';
+import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
 import { Plus, X, Save, Edit2, Trash2, ArrowLeft } from 'lucide-react-native';
+
+type Exercise = {
+  exercise_name: string;
+  sets: number;
+  reps: number;
+  weight_lbs: number;
+  notes: string;
+};
 
 type CycleWorkoutCount = {
   cycle_id: string;
@@ -166,7 +174,11 @@ export default function CycleDetails() {
         if (exercises.length > 0) {
           const exercisesData = exercises.map((ex) => ({
             workout_id: editingWorkout.id,
-            ...ex,
+            exercise_name: ex.exercise_name,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight_lbs: ex.weight_lbs,
+            notes: ex.notes,
           }));
           await supabase.from('exercises').insert(exercisesData);
         }
@@ -188,7 +200,11 @@ export default function CycleDetails() {
       if (!workoutError && workout && exercises.length > 0) {
         const exercisesData = exercises.map((ex) => ({
           workout_id: workout.id,
-          ...ex,
+          exercise_name: ex.exercise_name,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight_lbs: ex.weight_lbs,
+          notes: ex.notes,
         }));
         await supabase.from('exercises').insert(exercisesData);
       }
