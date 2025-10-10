@@ -10,9 +10,13 @@ const { width } = Dimensions.get('window');
 type ProgressGraphsProps = {
   workouts: Workout[];
   strengthTests: StrengthTest[];
+  cycleId?: string;
 };
 
-export function ProgressGraphs({ workouts, strengthTests }: ProgressGraphsProps) {
+export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGraphsProps) {
+  const filteredWorkouts = cycleId
+    ? workouts.filter((w) => w.cycle_id === cycleId)
+    : workouts;
   const { isPremium } = useAuth();
   const [showPaywall, setShowPaywall] = useState(false);
 
@@ -23,7 +27,7 @@ export function ProgressGraphs({ workouts, strengthTests }: ProgressGraphsProps)
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dayWorkouts = workouts.filter(
+      const dayWorkouts = filteredWorkouts.filter(
         (w) => new Date(w.created_at).toDateString() === date.toDateString()
       );
       last7Days.push({
@@ -37,7 +41,7 @@ export function ProgressGraphs({ workouts, strengthTests }: ProgressGraphsProps)
 
   const getWorkoutTypeDistribution = () => {
     const distribution: Record<string, number> = {};
-    workouts.forEach((w) => {
+    filteredWorkouts.forEach((w) => {
       distribution[w.workout_type] = (distribution[w.workout_type] || 0) + 1;
     });
     return distribution;
@@ -131,7 +135,7 @@ export function ProgressGraphs({ workouts, strengthTests }: ProgressGraphsProps)
 
         {isPremium ? (
           <View style={styles.intensityList}>
-            {workouts.slice(0, 10).map((workout, index) => (
+            {filteredWorkouts.slice(0, 10).map((workout, index) => (
               <View key={workout.id} style={styles.intensityItem}>
                 <Text style={styles.intensityIndex}>#{index + 1}</Text>
                 <View style={styles.intensityBar}>

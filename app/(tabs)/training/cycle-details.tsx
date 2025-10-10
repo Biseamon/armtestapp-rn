@@ -8,34 +8,30 @@ import {
   TextInput,
   Modal,
   Alert,
-  Platform,
 } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { supabase, Workout, Cycle } from '@/lib/supabase';
+import { supabase, Workout, Cycle, Exercise } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
-import { Plus, X, Save, Edit2, Trash2, Calendar as CalendarIcon } from 'lucide-react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { Plus, X, Save, Edit2, Trash2, ArrowLeft } from 'lucide-react-native';
 
-type Exercise = {
-  exercise_name: string;
-  sets: number;
-  reps: number;
-  weight_lbs: number;
-  notes: string;
+type CycleWorkoutCount = {
+  cycle_id: string;
+  workout_count: number;
 };
 
-export default function Training() {
+export default function CycleDetails() {
+  const { cycleId } = useLocalSearchParams();
   const { profile, isPremium } = useAuth();
   const { colors } = useTheme();
+  const [cycle, setCycle] = useState<Cycle | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [cycles, setCycles] = useState<Cycle[]>([]);
-  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
-  const [showCycleModal, setShowCycleModal] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
   const [workoutCount, setWorkoutCount] = useState(0);
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
 
@@ -43,52 +39,45 @@ export default function Training() {
   const [duration, setDuration] = useState('30');
   const [intensity, setIntensity] = useState('5');
   const [notes, setNotes] = useState('');
-  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
-
-  const [cycleName, setCycleName] = useState('');
-  const [cycleType, setCycleType] = useState('competition_prep');
-  const [cycleDescription, setCycleDescription] = useState('');
-  const [cycleStartDate, setCycleStartDate] = useState(new Date());
-  const [cycleEndDate, setCycleEndDate] = useState(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      if (profile) {
-        fetchData();
+      if (profile && cycleId) {
+        fetchCycleData();
       }
-    }, [profile])
+    }, [profile, cycleId])
   );
 
-  const fetchData = async () => {
-    if (!profile) return;
+  const fetchCycleData = async () => {
+    if (!profile || !cycleId) return;
 
-    const [workoutsRes, cyclesRes, countRes] = await Promise.all([
+    const [cycleRes, workoutsRes, countRes] = await Promise.all([
+      supabase.from('cycles').select('*').eq('id', cycleId).maybeSingle(),
       supabase
         .from('workouts')
         .select('*')
-        .eq('user_id', profile.id)
+        .eq('cycle_id', cycleId)
         .order('created_at', { ascending: false }),
-      supabase
-        .from('cycles')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('start_date', { ascending: false }),
-      supabase
-        .from('workouts')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', profile.id),
+      supabase.rpc('count', {
+        table_name: 'cycle_workout_counts',
+        filter: `cycle_id.eq.${cycleId}`,
+      }),
     ]);
 
+    if (cycleRes.data) setCycle(cycleRes.data);
     if (workoutsRes.data) setWorkouts(workoutsRes.data);
-    if (cyclesRes.data) setCycles(cyclesRes.data);
-    setWorkoutCount(countRes.count || 0);
+
+    const { count } = await supabase
+      .from('workouts')
+      .select('*', { count: 'exact', head: true })
+      .eq('cycle_id', cycleId);
+
+    setWorkoutCount(count || 0);
   };
 
   const handleStartWorkout = () => {
-    if (!isPremium && workoutCount >= 5) {
+    if (!isPremium && workoutCount >= 3) {
       setShowPaywall(true);
       return;
     }
@@ -103,7 +92,6 @@ export default function Training() {
     setDuration(String(workout.duration_minutes));
     setIntensity(String(workout.intensity));
     setNotes(workout.notes);
-    setSelectedCycleId(workout.cycle_id);
 
     const { data: exercisesData } = await supabase
       .from('exercises')
@@ -128,7 +116,7 @@ export default function Training() {
           style: 'destructive',
           onPress: async () => {
             await supabase.from('workouts').delete().eq('id', workout.id);
-            fetchData();
+            fetchCycleData();
           },
         },
       ]
@@ -146,14 +134,18 @@ export default function Training() {
     setExercises(exercises.filter((_, i) => i !== index));
   };
 
-  const handleUpdateExercise = (index: number, field: keyof Exercise, value: any) => {
+  const handleUpdateExercise = (
+    index: number,
+    field: keyof Exercise,
+    value: any
+  ) => {
     const updated = [...exercises];
     updated[index] = { ...updated[index], [field]: value };
     setExercises(updated);
   };
 
   const handleSaveWorkout = async () => {
-    if (!profile) return;
+    if (!profile || !cycleId) return;
 
     setSaving(true);
 
@@ -165,7 +157,6 @@ export default function Training() {
           duration_minutes: parseInt(duration) || 0,
           intensity: parseInt(intensity) || 5,
           notes,
-          cycle_id: selectedCycleId,
         })
         .eq('id', editingWorkout.id);
 
@@ -189,7 +180,7 @@ export default function Training() {
           duration_minutes: parseInt(duration) || 0,
           intensity: parseInt(intensity) || 5,
           notes,
-          cycle_id: selectedCycleId,
+          cycle_id: cycleId as string,
         })
         .select()
         .single();
@@ -206,50 +197,7 @@ export default function Training() {
     setSaving(false);
     setShowWorkoutModal(false);
     resetForm();
-    fetchData();
-  };
-
-  const handleSaveCycle = async () => {
-    if (!profile || !cycleName) return;
-
-    await supabase.from('cycles').insert({
-      user_id: profile.id,
-      name: cycleName,
-      description: cycleDescription,
-      cycle_type: cycleType,
-      start_date: cycleStartDate.toISOString().split('T')[0],
-      end_date: cycleEndDate.toISOString().split('T')[0],
-      is_active: false,
-    });
-
-    setShowCycleModal(false);
-    resetCycleForm();
-    fetchData();
-  };
-
-  const handleDeleteCycle = (cycle: Cycle) => {
-    Alert.alert('Delete Cycle', 'Are you sure you want to delete this cycle?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('cycles').delete().eq('id', cycle.id);
-          fetchData();
-        },
-      },
-    ]);
-  };
-
-  const handleToggleActiveCycle = async (cycle: Cycle) => {
-    await supabase.from('cycles').update({ is_active: false }).eq('user_id', profile!.id);
-
-    await supabase
-      .from('cycles')
-      .update({ is_active: !cycle.is_active })
-      .eq('id', cycle.id);
-
-    fetchData();
+    fetchCycleData();
   };
 
   const resetForm = () => {
@@ -257,17 +205,8 @@ export default function Training() {
     setDuration('30');
     setIntensity('5');
     setNotes('');
-    setSelectedCycleId(null);
     setExercises([]);
     setEditingWorkout(null);
-  };
-
-  const resetCycleForm = () => {
-    setCycleName('');
-    setCycleType('competition_prep');
-    setCycleDescription('');
-    setCycleStartDate(new Date());
-    setCycleEndDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
   };
 
   const workoutTypes = [
@@ -278,14 +217,6 @@ export default function Training() {
     { value: 'sparring', label: 'Sparring' },
   ];
 
-  const cycleTypes = [
-    { value: 'competition_prep', label: 'Competition Prep' },
-    { value: 'rehab', label: 'Rehabilitation' },
-    { value: 'strength_building', label: 'Strength Building' },
-    { value: 'technique_focus', label: 'Technique Focus' },
-    { value: 'off_season', label: 'Off Season' },
-  ];
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -294,63 +225,55 @@ export default function Training() {
     });
   };
 
+  if (!cycle) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Training</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={[styles.addButton, styles.cycleButton]}
-            onPress={() => setShowCycleModal(true)}
-          >
-            <CalendarIcon size={20} color="#FFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addButton} onPress={handleStartWorkout}>
-            <Plus size={24} color="#FFF" />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#FFF" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+            {cycle.name}
+          </Text>
         </View>
+        <TouchableOpacity style={styles.addButton} onPress={handleStartWorkout}>
+          <Plus size={24} color="#FFF" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }}>
         <AdBanner />
 
-        {cycles.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Training Cycles</Text>
-            {cycles.map((cycle) => (
-              <TouchableOpacity
-                key={cycle.id}
-                style={[styles.cycleCard, cycle.is_active && styles.cycleCardActive]}
-                onPress={() => handleToggleActiveCycle(cycle)}
-                onLongPress={() => handleDeleteCycle(cycle)}
-              >
-                <View style={styles.cycleHeader}>
-                  <Text style={styles.cycleName}>{cycle.name}</Text>
-                  {cycle.is_active && (
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText}>ACTIVE</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.cycleType}>
-                  {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
-                </Text>
-                <Text style={styles.cycleDates}>
-                  {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
-                </Text>
-                {cycle.description && (
-                  <Text style={styles.cycleDescription} numberOfLines={2}>
-                    {cycle.description}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        <View style={styles.cycleInfoCard}>
+          <Text style={styles.cycleType}>
+            {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
+          </Text>
+          <Text style={styles.cycleDates}>
+            {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
+          </Text>
+          {cycle.description && (
+            <Text style={styles.cycleDescription}>{cycle.description}</Text>
+          )}
+        </View>
 
         {!isPremium && (
           <View style={styles.limitCard}>
-            <Text style={styles.limitText}>Free: {workoutCount}/5 workouts tracked</Text>
+            <Text style={styles.limitText}>
+              Free: {workoutCount}/3 trainings in this cycle
+            </Text>
             <TouchableOpacity
               style={styles.upgradeButton}
               onPress={() => setShowPaywall(true)}
@@ -361,11 +284,13 @@ export default function Training() {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Workouts</Text>
+          <Text style={styles.sectionTitle}>
+            Trainings ({workoutCount})
+          </Text>
           {workouts.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No workouts yet</Text>
-              <Text style={styles.emptySubtext}>Start tracking your training!</Text>
+              <Text style={styles.emptyText}>No trainings yet</Text>
+              <Text style={styles.emptySubtext}>Add your first training!</Text>
             </View>
           ) : (
             workouts.map((workout) => (
@@ -422,7 +347,7 @@ export default function Training() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              {editingWorkout ? 'Edit Workout' : 'Log Workout'}
+              {editingWorkout ? 'Edit Training' : 'Log Training'}
             </Text>
             <TouchableOpacity onPress={() => setShowWorkoutModal(false)}>
               <X size={24} color="#999" />
@@ -430,49 +355,6 @@ export default function Training() {
           </View>
 
           <ScrollView style={styles.modalContent}>
-            {cycles.length > 0 && (
-              <>
-                <Text style={styles.label}>Training Cycle (Optional)</Text>
-                <View style={styles.typeContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      selectedCycleId === null && styles.typeButtonActive,
-                    ]}
-                    onPress={() => setSelectedCycleId(null)}
-                  >
-                    <Text
-                      style={[
-                        styles.typeButtonText,
-                        selectedCycleId === null && styles.typeButtonTextActive,
-                      ]}
-                    >
-                      None
-                    </Text>
-                  </TouchableOpacity>
-                  {cycles.map((cycle) => (
-                    <TouchableOpacity
-                      key={cycle.id}
-                      style={[
-                        styles.typeButton,
-                        selectedCycleId === cycle.id && styles.typeButtonActive,
-                      ]}
-                      onPress={() => setSelectedCycleId(cycle.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.typeButtonText,
-                          selectedCycleId === cycle.id && styles.typeButtonTextActive,
-                        ]}
-                      >
-                        {cycle.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
             <Text style={styles.label}>Workout Type</Text>
             <View style={styles.typeContainer}>
               {workoutTypes.map((type) => (
@@ -606,131 +488,8 @@ export default function Training() {
             >
               <Save size={20} color="#FFF" />
               <Text style={styles.saveButtonText}>
-                {saving ? 'Saving...' : editingWorkout ? 'Update Workout' : 'Save Workout'}
+                {saving ? 'Saving...' : editingWorkout ? 'Update Training' : 'Save Training'}
               </Text>
-            </TouchableOpacity>
-
-            <View style={styles.modalBottomSpacing} />
-          </ScrollView>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={showCycleModal}
-        animationType="slide"
-        onRequestClose={() => setShowCycleModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Training Cycle</Text>
-            <TouchableOpacity onPress={() => setShowCycleModal(false)}>
-              <X size={24} color="#999" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <Text style={styles.label}>Cycle Name</Text>
-            <TextInput
-              style={styles.input}
-              value={cycleName}
-              onChangeText={setCycleName}
-              placeholder="e.g., Competition Prep 2025"
-              placeholderTextColor="#666"
-            />
-
-            <Text style={styles.label}>Cycle Type</Text>
-            <View style={styles.typeContainer}>
-              {cycleTypes.map((type) => (
-                <TouchableOpacity
-                  key={type.value}
-                  style={[
-                    styles.typeButton,
-                    cycleType === type.value && styles.typeButtonActive,
-                  ]}
-                  onPress={() => setCycleType(type.value)}
-                >
-                  <Text
-                    style={[
-                      styles.typeButtonText,
-                      cycleType === type.value && styles.typeButtonTextActive,
-                    ]}
-                  >
-                    {type.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Start Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowStartDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {cycleStartDate.toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Text>
-              <CalendarIcon size={20} color="#999" />
-            </TouchableOpacity>
-            {showStartDatePicker && (
-              <DateTimePicker
-                value={cycleStartDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, selectedDate) => {
-                  setShowStartDatePicker(Platform.OS === 'ios');
-                  if (selectedDate) {
-                    setCycleStartDate(selectedDate);
-                  }
-                }}
-              />
-            )}
-
-            <Text style={styles.label}>End Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowEndDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {cycleEndDate.toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Text>
-              <CalendarIcon size={20} color="#999" />
-            </TouchableOpacity>
-            {showEndDatePicker && (
-              <DateTimePicker
-                value={cycleEndDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, selectedDate) => {
-                  setShowEndDatePicker(Platform.OS === 'ios');
-                  if (selectedDate) {
-                    setCycleEndDate(selectedDate);
-                  }
-                }}
-              />
-            )}
-
-            <Text style={styles.label}>Description (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={cycleDescription}
-              onChangeText={setCycleDescription}
-              multiline
-              numberOfLines={3}
-              placeholder="Describe your training cycle..."
-              placeholderTextColor="#666"
-            />
-
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveCycle}>
-              <Save size={20} color="#FFF" />
-              <Text style={styles.saveButtonText}>Create Cycle</Text>
             </TouchableOpacity>
 
             <View style={styles.modalBottomSpacing} />
@@ -742,7 +501,7 @@ export default function Training() {
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
         onUpgrade={() => setShowPaywall(false)}
-        feature="Unlimited workout tracking"
+        feature="Unlimited trainings per cycle"
       />
     </View>
   );
@@ -759,14 +518,17 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
   },
+  backButton: {
+    width: 40,
+  },
+  headerContent: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFF',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 12,
   },
   addButton: {
     backgroundColor: '#E63946',
@@ -776,55 +538,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cycleButton: {
-    backgroundColor: '#2A7DE1',
-  },
   content: {
     flex: 1,
     padding: 20,
   },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 12,
-  },
-  cycleCard: {
+  cycleInfoCard: {
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  cycleCardActive: {
     borderColor: '#2A7DE1',
-  },
-  cycleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cycleName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    flex: 1,
-  },
-  activeBadge: {
-    backgroundColor: '#2A7DE1',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  activeBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
   },
   cycleType: {
     fontSize: 14,
@@ -865,6 +589,15 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 12,
   },
   emptyState: {
     alignItems: 'center',
@@ -1079,19 +812,5 @@ const styles = StyleSheet.create({
   },
   modalBottomSpacing: {
     height: 40,
-  },
-  dateButton: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#FFF',
   },
 });
