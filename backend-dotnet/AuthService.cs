@@ -99,6 +99,9 @@ public class AuthService : IAuthService
         if (request.PreferredHand != null)
             user.PreferredHand = request.PreferredHand;
 
+        if (request.WeightUnit != null)
+            user.WeightUnit = request.WeightUnit;
+
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -138,7 +141,8 @@ public class AuthService : IAuthService
         user.FullName,
         user.WeightClass,
         user.PreferredHand,
+        user.WeightUnit,
         user.IsPremium,
         user.CreatedAt
-    );
+);
 }

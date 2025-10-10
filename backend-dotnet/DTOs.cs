@@ -25,6 +25,7 @@ public record UserDto(
     string? FullName,
     int? WeightClass,
     string? PreferredHand,
+    string WeightUnit,
     bool IsPremium,
     DateTime CreatedAt
 );
@@ -32,7 +33,8 @@ public record UserDto(
 public record UpdateProfileRequest(
     string? FullName,
     int? WeightClass,
-    string? PreferredHand
+    string? PreferredHand,
+    string? WeightUnit
 );
 
 // Workout DTOs

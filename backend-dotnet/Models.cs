@@ -21,6 +21,8 @@ public class User
 
     public string? PreferredHand { get; set; }
 
+    public string WeightUnit { get; set; } = "lbs";
+
     public bool IsPremium { get; set; } = false;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
