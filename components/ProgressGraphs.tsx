@@ -2,8 +2,6 @@ import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-nati
 import { Workout, StrengthTest } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaywallModal } from './PaywallModal';
-import { PieChart } from './charts/PieChart';
-import { LineChart } from './charts/LineChart';
 import { useState } from 'react';
 import { Lock } from 'lucide-react-native';
 
@@ -104,20 +102,7 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
         <Text style={styles.graphTitle}>Training Volume by Type</Text>
         <Text style={styles.graphSubtitle}>Total minutes per category</Text>
 
-        <View style={styles.pieChartContainer}>
-          <PieChart
-            data={[
-              { value: getTotalDurationByType('strength'), color: '#E63946' },
-              { value: getTotalDurationByType('table_practice'), color: '#2A7DE1' },
-              { value: getTotalDurationByType('technique'), color: '#FFD700' },
-              { value: getTotalDurationByType('endurance'), color: '#4CAF50' },
-              { value: getTotalDurationByType('sparring'), color: '#FF6B6B' },
-            ].filter((d) => d.value > 0)}
-            size={160}
-          />
-        </View>
-
-        <View style={styles.legendContainer}>
+        <View style={styles.volumeList}>
           {[
             { type: 'strength', color: '#E63946' },
             { type: 'table_practice', color: '#2A7DE1' },
@@ -126,13 +111,22 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
             { type: 'sparring', color: '#FF6B6B' },
           ].map(({ type, color }) => {
             const duration = getTotalDurationByType(type);
-            if (duration === 0) return null;
+            const total = ['strength', 'table_practice', 'technique', 'endurance', 'sparring']
+              .reduce((sum, t) => sum + getTotalDurationByType(t), 0);
+            const percentage = total > 0 ? (duration / total) * 100 : 0;
+
             return (
-              <View key={type} style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: color }]} />
-                <Text style={styles.legendLabel}>
-                  {type.replace(/_/g, ' ')}: {duration}m
-                </Text>
+              <View key={type} style={styles.volumeItem}>
+                <View style={styles.volumeHeader}>
+                  <View style={[styles.legendColor, { backgroundColor: color }]} />
+                  <Text style={styles.volumeLabel}>
+                    {type.replace(/_/g, ' ')}
+                  </Text>
+                  <Text style={styles.volumeValue}>{duration}m</Text>
+                </View>
+                <View style={styles.volumeBarContainer}>
+                  <View style={[styles.volumeBar, { width: `${percentage}%`, backgroundColor: color }]} />
+                </View>
               </View>
             );
           })}
@@ -190,18 +184,25 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
 
         {isPremium ? (
           getRecentTrend('strength').length > 0 ? (
-            <LineChart
-              data={getRecentTrend('strength').map((w) => ({
-                value: w.intensity,
-                label: new Date(w.created_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                }),
-              }))}
-              color="#E63946"
-              width={width - 80}
-              height={180}
-            />
+            <View style={styles.trendList}>
+              {getRecentTrend('strength').map((workout, index) => (
+                <View key={workout.id} style={styles.trendItem}>
+                  <Text style={styles.trendIndex}>#{index + 1}</Text>
+                  <View style={styles.trendInfo}>
+                    <Text style={styles.trendDate}>
+                      {new Date(workout.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Text>
+                    <View style={styles.trendProgressBar}>
+                      <View style={[styles.trendProgressFill, { width: `${(workout.intensity / 10) * 100}%`, backgroundColor: '#E63946' }]} />
+                    </View>
+                    <Text style={styles.trendValue}>Intensity: {workout.intensity}/10</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           ) : (
             <Text style={styles.noDataText}>No strength workouts yet</Text>
           )
@@ -217,18 +218,25 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
         <Text style={styles.graphSubtitle}>Duration over time</Text>
 
         {getRecentTrend('technique').length > 0 ? (
-          <LineChart
-            data={getRecentTrend('technique').map((w) => ({
-              value: w.duration_minutes,
-              label: new Date(w.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              }),
-            }))}
-            color="#FFD700"
-            width={width - 80}
-            height={180}
-          />
+          <View style={styles.trendList}>
+            {getRecentTrend('technique').map((workout, index) => (
+              <View key={workout.id} style={styles.trendItem}>
+                <Text style={styles.trendIndex}>#{index + 1}</Text>
+                <View style={styles.trendInfo}>
+                  <Text style={styles.trendDate}>
+                    {new Date(workout.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                  <View style={styles.trendProgressBar}>
+                    <View style={[styles.trendProgressFill, { width: `${Math.min((workout.duration_minutes / 60) * 100, 100)}%`, backgroundColor: '#FFD700' }]} />
+                  </View>
+                  <Text style={styles.trendValue}>{workout.duration_minutes}min</Text>
+                </View>
+              </View>
+            ))}
+          </View>
         ) : (
           <Text style={styles.noDataText}>No technique workouts yet</Text>
         )}
@@ -251,18 +259,25 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
 
         {isPremium ? (
           getRecentTrend('endurance').length > 0 ? (
-            <LineChart
-              data={getRecentTrend('endurance').map((w) => ({
-                value: w.duration_minutes,
-                label: new Date(w.created_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                }),
-              }))}
-              color="#4CAF50"
-              width={width - 80}
-              height={180}
-            />
+            <View style={styles.trendList}>
+              {getRecentTrend('endurance').map((workout, index) => (
+                <View key={workout.id} style={styles.trendItem}>
+                  <Text style={styles.trendIndex}>#{index + 1}</Text>
+                  <View style={styles.trendInfo}>
+                    <Text style={styles.trendDate}>
+                      {new Date(workout.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Text>
+                    <View style={styles.trendProgressBar}>
+                      <View style={[styles.trendProgressFill, { width: `${Math.min((workout.duration_minutes / 60) * 100, 100)}%`, backgroundColor: '#4CAF50' }]} />
+                    </View>
+                    <Text style={styles.trendValue}>{workout.duration_minutes}min</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           ) : (
             <Text style={styles.noDataText}>No endurance workouts yet</Text>
           )
@@ -278,18 +293,25 @@ export function ProgressGraphs({ workouts, strengthTests, cycleId }: ProgressGra
         <Text style={styles.graphSubtitle}>Intensity over time</Text>
 
         {getRecentTrend('table_practice').length > 0 ? (
-          <LineChart
-            data={getRecentTrend('table_practice').map((w) => ({
-              value: w.intensity,
-              label: new Date(w.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              }),
-            }))}
-            color="#2A7DE1"
-            width={width - 80}
-            height={180}
-          />
+          <View style={styles.trendList}>
+            {getRecentTrend('table_practice').map((workout, index) => (
+              <View key={workout.id} style={styles.trendItem}>
+                <Text style={styles.trendIndex}>#{index + 1}</Text>
+                <View style={styles.trendInfo}>
+                  <Text style={styles.trendDate}>
+                    {new Date(workout.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                  <View style={styles.trendProgressBar}>
+                    <View style={[styles.trendProgressFill, { width: `${(workout.intensity / 10) * 100}%`, backgroundColor: '#2A7DE1' }]} />
+                  </View>
+                  <Text style={styles.trendValue}>Intensity: {workout.intensity}/10</Text>
+                </View>
+              </View>
+            ))}
+          </View>
         ) : (
           <Text style={styles.noDataText}>No table practice workouts yet</Text>
         )}
@@ -490,10 +512,17 @@ const styles = StyleSheet.create({
   volumeItem: {
     gap: 8,
   },
+  volumeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   volumeLabel: {
     fontSize: 14,
     color: '#CCC',
     textTransform: 'capitalize',
+    flex: 1,
   },
   volumeBarContainer: {
     height: 24,
@@ -503,7 +532,6 @@ const styles = StyleSheet.create({
   },
   volumeBar: {
     height: '100%',
-    backgroundColor: '#2A7DE1',
   },
   volumeValue: {
     fontSize: 12,
@@ -563,12 +591,27 @@ const styles = StyleSheet.create({
   },
   trendInfo: {
     flex: 1,
+    gap: 8,
   },
   trendDate: {
     fontSize: 14,
     color: '#FFF',
     fontWeight: '600',
-    marginBottom: 4,
+  },
+  trendProgressBar: {
+    height: 20,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  trendProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  trendValue: {
+    fontSize: 12,
+    color: '#CCC',
+    fontWeight: '600',
   },
   trendStats: {
     flexDirection: 'row',
