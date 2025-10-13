@@ -16,7 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
-import { Plus, X, Save, Edit2, Trash2, Calendar as CalendarIcon } from 'lucide-react-native';
+import { Plus, X, Save, Edit2, Trash2, Calendar as CalendarIcon, Clock } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatWeight, convertToLbs, convertFromLbs } from '@/lib/weightUtils';
 
@@ -334,6 +334,12 @@ export default function Training() {
             onPress={handleAddCycle}
           >
             <CalendarIcon size={20} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addButton, { marginRight: 8 }]}
+            onPress={() => router.push('/(tabs)/training/schedule')}
+          >
+            <Clock size={20} color="#FFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={handleStartWorkout}>
             <Plus size={24} color="#FFF" />

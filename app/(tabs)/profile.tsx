@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  Image,
+  Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { Crown, User, LogOut, Shield, Info, Mail, Moon, Sun, Weight, Heart } from 'lucide-react-native';
+import { Crown, User, LogOut, Shield, Info, Mail, Moon, Sun, Weight, Heart, Camera } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function Profile() {
   const { profile, signOut, isPremium, refreshProfile } = useAuth();
@@ -20,6 +23,42 @@ export default function Profile() {
   const router = useRouter();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>(profile?.weight_unit || 'lbs');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (profile?.avatar_url) {
+      setAvatarUrl(profile.avatar_url);
+    }
+  }, [profile]);
+
+  const pickImage = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Image upload is not available in web browser. Please use the mobile app.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled && profile) {
+      setUploading(true);
+      const imageUri = result.assets[0].uri;
+
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: imageUri })
+        .eq('id', profile.id);
+
+      setAvatarUrl(imageUri);
+      await refreshProfile();
+      setUploading(false);
+    }
+  };
 
   const handleWeightUnitToggle = async (value: boolean) => {
     const newUnit = value ? 'kg' : 'lbs';
@@ -73,9 +112,20 @@ export default function Profile() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content}>
         <View style={[styles.header, { backgroundColor: colors.surface }]}>
-          <View style={[styles.avatarContainer, { backgroundColor: colors.background }]}>
-            <User size={60} color={colors.primary} strokeWidth={2} />
-          </View>
+          <TouchableOpacity
+            style={[styles.avatarContainer, { backgroundColor: colors.background }]}
+            onPress={pickImage}
+            disabled={uploading}
+          >
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            ) : (
+              <User size={60} color={colors.primary} strokeWidth={2} />
+            )}
+            <View style={styles.cameraIcon}>
+              <Camera size={20} color="#FFF" />
+            </View>
+          </TouchableOpacity>
           <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'User'}</Text>
           <Text style={[styles.email, { color: colors.textTertiary }]}>{profile?.email}</Text>
 
@@ -272,6 +322,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    position: 'relative',
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#E63946',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   name: {
     fontSize: 24,
