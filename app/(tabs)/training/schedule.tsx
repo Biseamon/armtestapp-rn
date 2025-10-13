@@ -15,7 +15,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { Plus, X, Calendar, Clock, Bell, BellOff, Trash2, CheckCircle } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as Notifications from 'expo-notifications';
 
 interface ScheduledTraining {
   id: string;
@@ -28,14 +27,6 @@ interface ScheduledTraining {
   completed: boolean;
   created_at: string;
 }
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 export default function ScheduleScreen() {
   const { profile } = useAuth();
@@ -55,19 +46,9 @@ export default function ScheduleScreen() {
     useCallback(() => {
       if (profile) {
         fetchTrainings();
-        requestNotificationPermissions();
       }
     }, [profile])
   );
-
-  const requestNotificationPermissions = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Notification permissions not granted');
-      }
-    }
-  };
 
   const fetchTrainings = async () => {
     if (!profile) return;
@@ -80,27 +61,6 @@ export default function ScheduleScreen() {
       .order('scheduled_time', { ascending: true });
 
     if (data) setTrainings(data);
-  };
-
-  const scheduleNotification = async (training: any) => {
-    if (Platform.OS === 'web') return;
-
-    const [hours, minutes] = training.scheduled_time.split(':').map(Number);
-    const scheduledDateTime = new Date(training.scheduled_date);
-    scheduledDateTime.setHours(hours, minutes, 0, 0);
-
-    const notificationTime = new Date(
-      scheduledDateTime.getTime() - training.notification_minutes_before * 60000
-    );
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Training Reminder',
-        body: `${training.title} in ${training.notification_minutes_before} minutes`,
-        sound: true,
-      },
-      trigger: notificationTime,
-    });
   };
 
   const handleSave = async () => {
@@ -119,15 +79,9 @@ export default function ScheduleScreen() {
       completed: false,
     };
 
-    const { data } = await supabase
+    await supabase
       .from('scheduled_trainings')
-      .insert(newTraining)
-      .select()
-      .single();
-
-    if (data && notificationEnabled) {
-      await scheduleNotification(data);
-    }
+      .insert(newTraining);
 
     setTitle('');
     setDescription('');

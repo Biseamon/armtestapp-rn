@@ -15,7 +15,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { Crown, User, LogOut, Shield, Info, Mail, Moon, Sun, Weight, Heart, Camera } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
 
 export default function Profile() {
   const { profile, signOut, isPremium, refreshProfile } = useAuth();
@@ -24,7 +23,6 @@ export default function Profile() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>(profile?.weight_unit || 'lbs');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (profile?.avatar_url) {
@@ -33,31 +31,7 @@ export default function Profile() {
   }, [profile]);
 
   const pickImage = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert('Not Available', 'Image upload is not available in web browser. Please use the mobile app.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
-
-    if (!result.canceled && profile) {
-      setUploading(true);
-      const imageUri = result.assets[0].uri;
-
-      await supabase
-        .from('profiles')
-        .update({ avatar_url: imageUri })
-        .eq('id', profile.id);
-
-      setAvatarUrl(imageUri);
-      await refreshProfile();
-      setUploading(false);
-    }
+    Alert.alert('Coming Soon', 'Profile picture upload will be available in a future update.');
   };
 
   const handleWeightUnitToggle = async (value: boolean) => {
@@ -115,7 +89,6 @@ export default function Profile() {
           <TouchableOpacity
             style={[styles.avatarContainer, { backgroundColor: colors.background }]}
             onPress={pickImage}
-            disabled={uploading}
           >
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatar} />
