@@ -256,18 +256,25 @@ export default function Training() {
     fetchData();
   };
 
-  const handleDeleteCycle = (cycle: Cycle) => {
-    Alert.alert('Delete Cycle', 'Are you sure you want to delete this cycle?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('cycles').delete().eq('id', cycle.id);
-          fetchData();
+  const handleDeleteCycle = async (cycle: Cycle) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this cycle?')) {
+        await supabase.from('cycles').delete().eq('id', cycle.id);
+        fetchData();
+      }
+    } else {
+      Alert.alert('Delete Cycle', 'Are you sure you want to delete this cycle?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('cycles').delete().eq('id', cycle.id);
+            fetchData();
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const handleToggleActiveCycle = async (cycle: Cycle) => {

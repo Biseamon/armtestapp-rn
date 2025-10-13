@@ -103,8 +103,17 @@ export default function ScheduleScreen() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('scheduled_trainings').delete().eq('id', id);
-    fetchTrainings();
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this scheduled training?')) {
+        await supabase.from('scheduled_trainings').delete().eq('id', id);
+        fetchTrainings();
+      }
+    } else {
+      if (window.confirm('Are you sure you want to delete this scheduled training?')) {
+        await supabase.from('scheduled_trainings').delete().eq('id', id);
+        fetchTrainings();
+      }
+    }
   };
 
   return (

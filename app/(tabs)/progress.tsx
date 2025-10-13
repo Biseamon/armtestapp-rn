@@ -130,17 +130,24 @@ export default function Progress() {
   };
 
   const handleDeleteGoal = async (goalId: string) => {
-    Alert.alert('Delete Goal', 'Are you sure you want to delete this goal?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('goals').delete().eq('id', goalId);
-          fetchData();
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this goal?')) {
+        await supabase.from('goals').delete().eq('id', goalId);
+        fetchData();
+      }
+    } else {
+      Alert.alert('Delete Goal', 'Are you sure you want to delete this goal?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('goals').delete().eq('id', goalId);
+            fetchData();
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const handleToggleGoal = async (goal: Goal) => {
@@ -192,17 +199,24 @@ export default function Progress() {
   };
 
   const handleDeleteTest = async (testId: string) => {
-    Alert.alert('Delete Test', 'Are you sure you want to delete this test?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('strength_tests').delete().eq('id', testId);
-          fetchData();
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this test?')) {
+        await supabase.from('strength_tests').delete().eq('id', testId);
+        fetchData();
+      }
+    } else {
+      Alert.alert('Delete Test', 'Are you sure you want to delete this test?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('strength_tests').delete().eq('id', testId);
+            fetchData();
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const testTypes = [

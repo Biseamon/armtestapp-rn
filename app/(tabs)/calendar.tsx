@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, X, Trash2 } from 'lucide-react-native';
 
 interface Workout {
   id: string;
@@ -129,6 +130,20 @@ export default function CalendarScreen() {
     if (workoutCount > 0 || isInCycle) {
       setSelectedDate(date);
       setShowDayModal(true);
+    }
+  };
+
+  const handleDeleteWorkout = async (workoutId: string) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this workout?')) {
+        await supabase.from('workouts').delete().eq('id', workoutId);
+        fetchData();
+      }
+    } else {
+      if (window.confirm('Are you sure you want to delete this workout?')) {
+        await supabase.from('workouts').delete().eq('id', workoutId);
+        fetchData();
+      }
     }
   };
 
@@ -343,9 +358,14 @@ export default function CalendarScreen() {
                   </Text>
                   {getWorkoutsForDate(selectedDate).map((workout) => (
                     <View key={workout.id} style={styles.workoutCard}>
-                      <Text style={styles.workoutDuration}>
-                        {workout.duration_minutes} minutes
-                      </Text>
+                      <View style={styles.workoutHeader}>
+                        <Text style={styles.workoutDuration}>
+                          {workout.duration_minutes} minutes
+                        </Text>
+                        <TouchableOpacity onPress={() => handleDeleteWorkout(workout.id)}>
+                          <Trash2 size={18} color="#E63946" />
+                        </TouchableOpacity>
+                      </View>
                       {workout.notes && (
                         <Text style={styles.workoutNotes}>{workout.notes}</Text>
                       )}
@@ -514,11 +534,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  workoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   workoutDuration: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#E63946',
-    marginBottom: 4,
   },
   workoutNotes: {
     fontSize: 14,
