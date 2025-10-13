@@ -193,7 +193,10 @@ export default function Progress() {
   const handleEditTest = (test: StrengthTest) => {
     setEditingTest(test);
     setTestType(test.test_type);
-    setTestResult(test.result_value.toString());
+    const displayValue = profile?.weight_unit === 'kg'
+      ? (test.result_value / 2.20462).toFixed(1)
+      : test.result_value.toString();
+    setTestResult(displayValue);
     setTestNotes(test.notes || '');
     setShowTestModal(true);
   };
