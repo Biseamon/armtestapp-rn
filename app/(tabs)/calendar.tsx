@@ -44,6 +44,8 @@ export default function CalendarScreen() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
+  const [showWorkouts, setShowWorkouts] = useState(true);
+  const [showCycles, setShowCycles] = useState(true);
 
   useEffect(() => {
     if (profile) {
@@ -106,17 +108,25 @@ export default function CalendarScreen() {
   };
 
   const getDayColor = (workoutCount: number, isInCycle: boolean): string => {
+    if (!showWorkouts && !showCycles) return '#2A2A2A';
+    if (!showWorkouts && isInCycle && showCycles) return '#2A7DE144';
+    if (!showCycles && workoutCount > 0 && showWorkouts) {
+      if (workoutCount === 1) return '#E6394655';
+      if (workoutCount === 2) return '#E6394688';
+      if (workoutCount >= 3) return '#E63946';
+    }
     if (workoutCount === 0 && !isInCycle) return '#2A2A2A';
-    if (isInCycle && workoutCount === 0) return '#2A7DE144';
-    if (workoutCount === 1) return '#E6394655';
-    if (workoutCount === 2) return '#E6394688';
-    if (workoutCount >= 3) return '#E63946';
+    if (isInCycle && workoutCount === 0 && showCycles) return '#2A7DE144';
+    if (workoutCount === 1 && showWorkouts) return '#E6394655';
+    if (workoutCount === 2 && showWorkouts) return '#E6394688';
+    if (workoutCount >= 3 && showWorkouts) return '#E63946';
     return '#2A2A2A';
   };
 
   const handleDayPress = (date: Date) => {
     const workoutCount = getWorkoutCountForDate(date);
-    if (workoutCount > 0) {
+    const { isInCycle } = isDateInCycle(date);
+    if (workoutCount > 0 || isInCycle) {
       setSelectedDate(date);
       setShowDayModal(true);
     }
@@ -158,7 +168,7 @@ export default function CalendarScreen() {
                 width: daySize,
                 height: daySize,
                 backgroundColor: dayColor,
-                borderWidth: isInCycle ? 2 : 0,
+                borderWidth: isInCycle && showCycles ? 2 : 0,
                 borderColor: '#2A7DE1',
               },
             ]}
@@ -233,6 +243,41 @@ export default function CalendarScreen() {
               selectedYear >= new Date().getFullYear() ? '#333' : '#FFF'
             }
           />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.filterContainer}>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            showWorkouts && styles.filterButtonActive,
+          ]}
+          onPress={() => setShowWorkouts(!showWorkouts)}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              showWorkouts && styles.filterTextActive,
+            ]}
+          >
+            Workouts
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            showCycles && styles.filterButtonActive,
+          ]}
+          onPress={() => setShowCycles(!showCycles)}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              showCycles && styles.filterTextActive,
+            ]}
+          >
+            Cycles
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -349,6 +394,32 @@ const styles = StyleSheet.create({
   yearText: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  filterButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#2A2A2A',
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#E63946',
+  },
+  filterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#999',
+  },
+  filterTextActive: {
+    color: '#FFF',
   },
   legend: {
     flexDirection: 'row',

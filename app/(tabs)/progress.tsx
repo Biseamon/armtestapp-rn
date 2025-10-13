@@ -162,6 +162,7 @@ export default function Progress() {
             workouts={workouts}
             strengthTests={strengthTests}
             weightUnit={profile?.weight_unit || 'lbs'}
+            isPremium={isPremium}
           />
         </View>
 

@@ -64,7 +64,7 @@ export default function Profile() {
   const handleDonate = () => {
     Alert.alert(
       'Support Development',
-      'Thank you for considering supporting Arm Wrestling Pro! Your donation helps us continue improving the app and adding new features.\n\nDonation options will be available soon through in-app purchases.',
+      'To integrate Stripe for donations, you will need to:\n\n1. Create a Stripe account at stripe.com\n2. Get your Stripe publishable and secret keys\n3. Configure your environment variables\n4. Deploy an edge function to handle payments\n\nFor detailed instructions, see docs/STRIPE_INTEGRATION.md\n\nThank you for your support!',
       [{ text: 'OK' }]
     );
   };
