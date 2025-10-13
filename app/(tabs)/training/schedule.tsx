@@ -212,52 +212,95 @@ export default function ScheduleScreen() {
             />
 
             <Text style={styles.label}>Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Calendar size={20} color="#FFF" />
-              <Text style={styles.dateButtonText}>
-                {selectedDate.toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="default"
-                onChange={(event, date) => {
-                  setShowDatePicker(Platform.OS === 'ios');
-                  if (date) setSelectedDate(date);
+            {Platform.OS === 'web' ? (
+              <input
+                type="date"
+                value={selectedDate.toISOString().split('T')[0]}
+                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                style={{
+                  padding: 12,
+                  backgroundColor: '#2A2A2A',
+                  border: '1px solid #444',
+                  borderRadius: 8,
+                  color: '#FFF',
+                  fontSize: 16,
+                  marginBottom: 16,
                 }}
               />
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Calendar size={20} color="#FFF" />
+                  <Text style={styles.dateButtonText}>
+                    {selectedDate.toLocaleDateString()}
+                  </Text>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display="default"
+                    onChange={(event, date) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (date) setSelectedDate(date);
+                    }}
+                  />
+                )}
+              </>
             )}
 
             <Text style={styles.label}>Time</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Clock size={20} color="#FFF" />
-              <Text style={styles.dateButtonText}>
-                {selectedTime.toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
-            </TouchableOpacity>
-
-            {showTimePicker && (
-              <DateTimePicker
-                value={selectedTime}
-                mode="time"
-                display="default"
-                onChange={(event, time) => {
-                  setShowTimePicker(Platform.OS === 'ios');
-                  if (time) setSelectedTime(time);
+            {Platform.OS === 'web' ? (
+              <input
+                type="time"
+                value={selectedTime.toTimeString().split(' ')[0].slice(0, 5)}
+                onChange={(e) => {
+                  const [hours, minutes] = e.target.value.split(':');
+                  const newTime = new Date();
+                  newTime.setHours(parseInt(hours), parseInt(minutes));
+                  setSelectedTime(newTime);
+                }}
+                style={{
+                  padding: 12,
+                  backgroundColor: '#2A2A2A',
+                  border: '1px solid #444',
+                  borderRadius: 8,
+                  color: '#FFF',
+                  fontSize: 16,
+                  marginBottom: 16,
                 }}
               />
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Clock size={20} color="#FFF" />
+                  <Text style={styles.dateButtonText}>
+                    {selectedTime.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </TouchableOpacity>
+
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    display="default"
+                    onChange={(event, time) => {
+                      setShowTimePicker(Platform.OS === 'ios');
+                      if (time) setSelectedTime(time);
+                    }}
+                  />
+                )}
+              </>
             )}
 
             <View style={styles.notificationSection}>
