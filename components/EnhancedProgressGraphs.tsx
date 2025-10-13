@@ -54,7 +54,8 @@ export function EnhancedProgressGraphs({ strengthTests, workouts, weightUnit, is
     return filteredTests
       .reverse()
       .map((test) => {
-        const value = weightUnit === 'lbs' ? convertToLbs(test.result_kg) : test.result_kg;
+        const valueLbs = test.result_value;
+        const value = weightUnit === 'kg' ? valueLbs / 2.20462 : valueLbs;
         return {
           value: Math.round(value * 10) / 10,
           label: new Date(test.created_at).toLocaleDateString('en-US', {
@@ -120,7 +121,9 @@ export function EnhancedProgressGraphs({ strengthTests, workouts, weightUnit, is
     return filteredTests
       .reverse()
       .map((test) => {
-        const score = Math.round(test.result_kg * 10) / 10;
+        const valueLbs = test.result_value;
+        const value = weightUnit === 'kg' ? valueLbs / 2.20462 : valueLbs;
+        const score = Math.round(value * 10) / 10;
         return {
           value: score,
           label: new Date(test.created_at).toLocaleDateString('en-US', {
@@ -130,7 +133,7 @@ export function EnhancedProgressGraphs({ strengthTests, workouts, weightUnit, is
           dataPointText: `${score}`,
         };
       });
-  }, [strengthTests, techniqueTimeRange]);
+  }, [strengthTests, techniqueTimeRange, weightUnit]);
 
   const renderTimeRangeSelector = (
     currentRange: TimeRange,
