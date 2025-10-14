@@ -13,7 +13,8 @@ import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
-import { Plus, X, Calendar, Clock, Bell, BellOff, Trash2, CircleCheck as CheckCircle, ArrowLeft } from 'lucide-react-native';
+import { scheduleTrainingNotification, cancelNotification, requestNotificationPermissions } from '@/lib/notifications';
+import { Plus, X, Calendar, Clock, Bell, BellOff, Trash2, CircleCheck as CheckCircle, ArrowLeft, Edit2 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface ScheduledTraining {
@@ -24,6 +25,7 @@ interface ScheduledTraining {
   scheduled_time: string;
   notification_enabled: boolean;
   notification_minutes_before: number;
+  notification_id: string | null;
   completed: boolean;
   created_at: string;
 }
@@ -33,6 +35,7 @@ export default function ScheduleScreen() {
   const { colors } = useTheme();
   const [trainings, setTrainings] = useState<ScheduledTraining[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingTraining, setEditingTraining] = useState<ScheduledTraining | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -67,21 +70,54 @@ export default function ScheduleScreen() {
     if (!profile || !title) return;
 
     const timeString = `${selectedTime.getHours().toString().padStart(2, '0')}:${selectedTime.getMinutes().toString().padStart(2, '0')}`;
+    const dateString = selectedDate.toISOString().split('T')[0];
 
-    const newTraining = {
-      user_id: profile.id,
-      title,
-      description,
-      scheduled_date: selectedDate.toISOString().split('T')[0],
-      scheduled_time: timeString,
-      notification_enabled: notificationEnabled,
-      notification_minutes_before: parseInt(minutesBefore),
-      completed: false,
-    };
+    let notificationId = null;
+    if (notificationEnabled) {
+      const { granted } = await requestNotificationPermissions();
+      if (granted) {
+        notificationId = await scheduleTrainingNotification(
+          editingTraining?.id || 'new',
+          title,
+          dateString,
+          timeString,
+          parseInt(minutesBefore)
+        );
+      }
+    }
 
-    await supabase
-      .from('scheduled_trainings')
-      .insert(newTraining);
+    if (editingTraining) {
+      if (editingTraining.notification_id && !notificationEnabled) {
+        await cancelNotification(editingTraining.notification_id);
+      }
+
+      await supabase
+        .from('scheduled_trainings')
+        .update({
+          title,
+          description,
+          scheduled_date: dateString,
+          scheduled_time: timeString,
+          notification_enabled: notificationEnabled,
+          notification_minutes_before: parseInt(minutesBefore),
+          notification_id: notificationId,
+        })
+        .eq('id', editingTraining.id);
+    } else {
+      await supabase
+        .from('scheduled_trainings')
+        .insert({
+          user_id: profile.id,
+          title,
+          description,
+          scheduled_date: dateString,
+          scheduled_time: timeString,
+          notification_enabled: notificationEnabled,
+          notification_minutes_before: parseInt(minutesBefore),
+          notification_id: notificationId,
+          completed: false,
+        });
+    }
 
     setTitle('');
     setDescription('');
@@ -89,28 +125,66 @@ export default function ScheduleScreen() {
     setSelectedTime(new Date());
     setNotificationEnabled(true);
     setMinutesBefore('30');
+    setEditingTraining(null);
     setShowModal(false);
     fetchTrainings();
   };
 
   const handleToggleComplete = async (training: ScheduledTraining) => {
+    const newStatus = !training.completed;
+
+    if (newStatus && profile) {
+      await supabase.from('workouts').insert({
+        user_id: profile.id,
+        workout_type: 'scheduled_training',
+        duration_minutes: 60,
+        intensity: 7,
+        notes: `Completed scheduled training: ${training.title}${training.description ? `\n${training.description}` : ''}`,
+        created_at: new Date().toISOString(),
+      });
+
+      if (training.notification_id) {
+        await cancelNotification(training.notification_id);
+      }
+    }
+
     await supabase
       .from('scheduled_trainings')
-      .update({ completed: !training.completed })
+      .update({ completed: newStatus })
       .eq('id', training.id);
 
     fetchTrainings();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleEdit = (training: ScheduledTraining) => {
+    setEditingTraining(training);
+    setTitle(training.title);
+    setDescription(training.description);
+    setSelectedDate(new Date(training.scheduled_date));
+    const [hours, minutes] = training.scheduled_time.split(':');
+    const time = new Date();
+    time.setHours(parseInt(hours), parseInt(minutes));
+    setSelectedTime(time);
+    setNotificationEnabled(training.notification_enabled);
+    setMinutesBefore(training.notification_minutes_before.toString());
+    setShowModal(true);
+  };
+
+  const handleDelete = async (training: ScheduledTraining) => {
     if (Platform.OS === 'web') {
       if (window.confirm('Are you sure you want to delete this scheduled training?')) {
-        await supabase.from('scheduled_trainings').delete().eq('id', id);
+        if (training.notification_id) {
+          await cancelNotification(training.notification_id);
+        }
+        await supabase.from('scheduled_trainings').delete().eq('id', training.id);
         fetchTrainings();
       }
     } else {
       if (window.confirm('Are you sure you want to delete this scheduled training?')) {
-        await supabase.from('scheduled_trainings').delete().eq('id', id);
+        if (training.notification_id) {
+          await cancelNotification(training.notification_id);
+        }
+        await supabase.from('scheduled_trainings').delete().eq('id', training.id);
         fetchTrainings();
       }
     }
@@ -160,7 +234,10 @@ export default function ScheduleScreen() {
                       color={training.completed ? '#10B981' : '#666'}
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(training.id)}>
+                  <TouchableOpacity onPress={() => handleEdit(training)}>
+                    <Edit2 size={20} color="#2A7DE1" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(training)}>
                     <Trash2 size={20} color="#E63946" />
                   </TouchableOpacity>
                 </View>
@@ -184,7 +261,7 @@ export default function ScheduleScreen() {
       <Modal visible={showModal} animationType="slide" onRequestClose={() => setShowModal(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Schedule Training</Text>
+            <Text style={styles.modalTitle}>{editingTraining ? 'Edit Training' : 'Schedule Training'}</Text>
             <TouchableOpacity onPress={() => setShowModal(false)}>
               <X size={24} color="#999" />
             </TouchableOpacity>
@@ -332,7 +409,7 @@ export default function ScheduleScreen() {
             </View>
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Schedule Training</Text>
+              <Text style={styles.saveButtonText}>{editingTraining ? 'Update Training' : 'Schedule Training'}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

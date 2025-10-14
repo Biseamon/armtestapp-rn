@@ -20,6 +20,7 @@ export default function Home() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [completedGoals, setCompletedGoals] = useState<any[]>([]);
+  const [scheduledTrainings, setScheduledTrainings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -33,7 +34,7 @@ export default function Home() {
     if (!profile) return;
 
     try {
-      const [recentWorkouts, allWorkouts, cyclesData, completedGoalsData] = await Promise.all([
+      const [recentWorkouts, allWorkouts, cyclesData, completedGoalsData, scheduledTrainingsData] = await Promise.all([
         supabase
           .from('workouts')
           .select('*')
@@ -58,6 +59,15 @@ export default function Home() {
           .eq('is_completed', true)
           .order('created_at', { ascending: false })
           .limit(3),
+        supabase
+          .from('scheduled_trainings')
+          .select('*')
+          .eq('user_id', profile.id)
+          .eq('completed', false)
+          .gte('scheduled_date', new Date().toISOString().split('T')[0])
+          .order('scheduled_date', { ascending: true })
+          .order('scheduled_time', { ascending: true })
+          .limit(5),
       ]);
 
       if (recentWorkouts.data) {
@@ -74,6 +84,10 @@ export default function Home() {
 
       if (completedGoalsData.data) {
         setCompletedGoals(completedGoalsData.data);
+      }
+
+      if (scheduledTrainingsData.data) {
+        setScheduledTrainings(scheduledTrainingsData.data);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -210,6 +224,47 @@ export default function Home() {
           <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Avg Intensity</Text>
         </View>
       </View>
+
+      {scheduledTrainings.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Trainings</Text>
+          {scheduledTrainings.map((training) => (
+            <TouchableOpacity
+              key={training.id}
+              style={[styles.trainingCard, { backgroundColor: colors.surface }]}
+              onPress={() => router.push('/(tabs)/training/schedule')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.trainingHeader}>
+                <Text style={[styles.trainingTitle, { color: colors.text }]}>
+                  {training.title}
+                </Text>
+                <Text style={[styles.trainingDate, { color: colors.primary }]}>
+                  {new Date(training.scheduled_date).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </View>
+              <View style={styles.trainingDetails}>
+                <Text style={[styles.trainingTime, { color: colors.textSecondary }]}>
+                  ⏰ {training.scheduled_time.slice(0, 5)}
+                </Text>
+                {training.notification_enabled && (
+                  <Text style={[styles.trainingNotif, { color: colors.secondary }]}>
+                    🔔 {training.notification_minutes_before}m before
+                  </Text>
+                )}
+              </View>
+              {training.description && (
+                <Text style={[styles.trainingDescription, { color: colors.textTertiary }]} numberOfLines={2}>
+                  {training.description}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {cycles.length > 0 && (
         <View style={styles.section}>
@@ -529,5 +584,41 @@ const styles = StyleSheet.create({
   goalCompleted: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  trainingCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2A7DE1',
+  },
+  trainingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  trainingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  trainingDate: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  trainingDetails: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
+  trainingTime: {
+    fontSize: 14,
+  },
+  trainingNotif: {
+    fontSize: 14,
+  },
+  trainingDescription: {
+    fontSize: 14,
   },
 });

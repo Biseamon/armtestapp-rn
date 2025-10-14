@@ -15,7 +15,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { Crown, User, LogOut, Shield, Info, Mail, Moon, Sun, Weight, Heart, Camera } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Crown, User, LogOut, Shield, Info, Mail, Moon, Sun, Weight, Heart, Camera, Plus, TrendingUp } from 'lucide-react-native';
 
 export default function Profile() {
   const { profile, signOut, isPremium, refreshProfile } = useAuth();
@@ -32,7 +33,31 @@ export default function Profile() {
   }, [profile]);
 
   const pickImage = async () => {
-    Alert.alert('Coming Soon', 'Profile picture upload will be available in a future update.');
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera roll permissions are required!');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled && result.assets[0] && profile) {
+      const imageUri = result.assets[0].uri;
+      setAvatarUrl(imageUri);
+
+      await supabase
+        .from('profiles')
+        .update({ profile_picture: imageUri })
+        .eq('id', profile.id);
+
+      await refreshProfile();
+    }
   };
 
   const handleWeightUnitToggle = async (value: boolean) => {
