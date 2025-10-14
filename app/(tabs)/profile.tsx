@@ -280,7 +280,9 @@ export default function Profile() {
                 <Text style={[styles.unitLabel, weightUnit === 'kg' && styles.unitLabelActive, { color: weightUnit === 'kg' ? colors.primary : colors.textTertiary }]}>kg</Text>
               </View>
             </View>
+          </View>
 
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <TouchableOpacity
               style={styles.settingItem}
               onPress={() => setShowMeasurements(true)}

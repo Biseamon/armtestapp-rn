@@ -134,6 +134,26 @@ export default function Progress() {
     setShowGoalModal(true);
   };
 
+  const handleIncrementGoal = async (goal: Goal) => {
+    const newValue = goal.current_value + 1;
+    const isCompleted = newValue >= goal.target_value;
+
+    await supabase
+      .from('goals')
+      .update({
+        current_value: newValue,
+        is_completed: isCompleted,
+      })
+      .eq('id', goal.id);
+
+    if (isCompleted) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 5000);
+    }
+
+    fetchData();
+  };
+
   const handleDeleteGoal = async (goalId: string) => {
     if (Platform.OS === 'web') {
       if (window.confirm('Are you sure you want to delete this goal?')) {
@@ -344,13 +364,27 @@ export default function Progress() {
                       {new Date(goal.deadline).toLocaleDateString()}
                     </Text>
                   )}
-                  <Text style={styles.goalProgress}>
-                    {goal.current_value} / {goal.target_value}
-                  </Text>
+                  <View style={styles.goalProgressRow}>
+                    <Text style={styles.goalProgress}>
+                      {goal.current_value} / {goal.target_value}
+                    </Text>
+                    {!goal.is_completed && goal.current_value < goal.target_value && (
+                      <TouchableOpacity
+                        style={styles.incrementButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleIncrementGoal(goal);
+                        }}
+                      >
+                        <Plus size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                   <View style={styles.progressBar}>
                     <View
                       style={[
                         styles.progressFill,
+                        goal.is_completed && styles.progressFillCompleted,
                         { width: `${getProgressPercentage(goal)}%` },
                       ]}
                     />
@@ -685,10 +719,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
+  goalProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   goalProgress: {
     fontSize: 14,
     color: '#CCC',
-    marginBottom: 8,
+  },
+  incrementButton: {
+    backgroundColor: '#E63946',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   progressBar: {
     height: 8,
@@ -700,6 +747,9 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#E63946',
     borderRadius: 4,
+  },
+  progressFillCompleted: {
+    backgroundColor: '#10B981',
   },
   testCard: {
     backgroundColor: '#2A2A2A',

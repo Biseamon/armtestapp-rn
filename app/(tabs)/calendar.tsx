@@ -64,6 +64,7 @@ export default function CalendarScreen() {
       if (profile) {
         fetchData();
       }
+      return () => {};
     }, [profile, selectedYear])
   );
 

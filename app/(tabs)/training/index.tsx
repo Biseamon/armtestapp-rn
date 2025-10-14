@@ -343,7 +343,7 @@ export default function Training() {
             <CalendarIcon size={20} color="#FFF" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.addButton, { marginRight: 8 }]}
+            style={[styles.addButton, styles.scheduleButton]}
             onPress={() => router.push('/(tabs)/training/schedule')}
           >
             <Clock size={20} color="#FFF" />
@@ -839,6 +839,9 @@ const styles = StyleSheet.create({
   },
   cycleButton: {
     backgroundColor: '#2A7DE1',
+  },
+  scheduleButton: {
+    backgroundColor: '#FF9500',
   },
   content: {
     flex: 1,
