@@ -18,6 +18,8 @@ import { supabase, Goal, StrengthTest, Workout } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
 import { EnhancedProgressGraphs } from '@/components/EnhancedProgressGraphs';
+import { ProgressReport } from '@/components/ProgressReport';
+import { Confetti } from '@/components/Confetti';
 import { Plus, Target, X, Save, Trophy, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatWeight, convertToLbs } from '@/lib/weightUtils';
@@ -33,6 +35,8 @@ export default function Progress() {
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -152,10 +156,17 @@ export default function Progress() {
   };
 
   const handleToggleGoal = async (goal: Goal) => {
+    const newStatus = !goal.is_completed;
+
     await supabase
       .from('goals')
-      .update({ is_completed: !goal.is_completed })
+      .update({ is_completed: newStatus })
       .eq('id', goal.id);
+
+    if (newStatus) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 5000);
+    }
 
     fetchData();
   };
@@ -237,8 +248,22 @@ export default function Progress() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Confetti active={showConfetti} />
+
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Progress</Text>
+        <TouchableOpacity
+          style={styles.reportButton}
+          onPress={() => {
+            if (isPremium) {
+              setShowReport(true);
+            } else {
+              setShowPaywall(true);
+            }
+          }}
+        >
+          <TrendingUp size={20} color={isPremium ? '#10B981' : '#666'} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content}>
@@ -540,7 +565,16 @@ export default function Progress() {
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
         onUpgrade={() => setShowPaywall(false)}
-        feature="Unlimited goals tracking"
+        feature="Progress Reports"
+      />
+
+      <ProgressReport
+        visible={showReport}
+        onClose={() => setShowReport(false)}
+        strengthTests={strengthTests}
+        workouts={workouts}
+        goals={goals}
+        weightUnit={profile?.weight_unit || 'lbs'}
       />
     </View>
   );
@@ -551,6 +585,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     paddingTop: 60,
   },
@@ -558,6 +595,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: '#FFF',
+  },
+  reportButton: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 12,
   },
   content: {
     flex: 1,

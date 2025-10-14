@@ -30,11 +30,19 @@ interface Cycle {
   cycle_type: string;
 }
 
+interface Goal {
+  id: string;
+  title: string;
+  target_date: string;
+  is_completed: boolean;
+}
+
 interface DayData {
   date: Date;
   workoutCount: number;
   isInCycle: boolean;
   cycleName?: string;
+  goalCount: number;
 }
 
 export default function CalendarScreen() {
@@ -42,12 +50,14 @@ export default function CalendarScreen() {
   const { profile } = useAuth();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
   const [showWorkouts, setShowWorkouts] = useState(true);
   const [showCycles, setShowCycles] = useState(true);
+  const [showGoals, setShowGoals] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,7 +73,7 @@ export default function CalendarScreen() {
     const startDate = `${selectedYear}-01-01`;
     const endDate = `${selectedYear}-12-31`;
 
-    const [workoutsRes, cyclesRes, profileRes] = await Promise.all([
+    const [workoutsRes, cyclesRes, goalsRes, profileRes] = await Promise.all([
       supabase
         .from('workouts')
         .select('*')
@@ -76,6 +86,12 @@ export default function CalendarScreen() {
         .select('*')
         .eq('user_id', profile.id),
       supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', profile.id)
+        .gte('target_date', startDate)
+        .lte('target_date', endDate),
+      supabase
         .from('profiles')
         .select('created_at')
         .eq('id', profile.id)
@@ -84,6 +100,7 @@ export default function CalendarScreen() {
 
     if (workoutsRes.data) setWorkouts(workoutsRes.data);
     if (cyclesRes.data) setCycles(cyclesRes.data);
+    if (goalsRes.data) setGoals(goalsRes.data);
 
     if (profileRes.data) {
       const registrationYear = new Date(profileRes.data.created_at).getFullYear();
@@ -99,6 +116,16 @@ export default function CalendarScreen() {
   const getWorkoutCountForDate = (date: Date): number => {
     const dateStr = date.toISOString().split('T')[0];
     return workouts.filter((w) => w.created_at.split('T')[0] === dateStr).length;
+  };
+
+  const getGoalCountForDate = (date: Date): number => {
+    const dateStr = date.toISOString().split('T')[0];
+    return goals.filter((g) => g.target_date === dateStr).length;
+  };
+
+  const getGoalsForDate = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return goals.filter((g) => g.target_date === dateStr);
   };
 
   const isDateInCycle = (date: Date): { isInCycle: boolean; cycleName?: string } => {
@@ -174,6 +201,7 @@ export default function CalendarScreen() {
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(selectedYear, month, day);
         const workoutCount = getWorkoutCountForDate(date);
+        const goalCount = getGoalCountForDate(date);
         const { isInCycle, cycleName } = isDateInCycle(date);
         const dayColor = getDayColor(workoutCount, isInCycle);
 
@@ -200,6 +228,11 @@ export default function CalendarScreen() {
             >
               {day}
             </Text>
+            {goalCount > 0 && showGoals && (
+              <View style={styles.goalIndicator}>
+                <Text style={styles.goalIndicatorText}>🎯</Text>
+              </View>
+            )}
           </TouchableOpacity>
         );
       }
@@ -297,6 +330,22 @@ export default function CalendarScreen() {
             Cycles
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            showGoals && styles.filterButtonActive,
+          ]}
+          onPress={() => setShowGoals(!showGoals)}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              showGoals && styles.filterTextActive,
+            ]}
+          >
+            Goals
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.legend}>
@@ -374,6 +423,29 @@ export default function CalendarScreen() {
                       )}
                     </View>
                   ))}
+
+                  <Text style={styles.modalSectionTitle}>
+                    Goals ({getGoalsForDate(selectedDate).length})
+                  </Text>
+                  {getGoalsForDate(selectedDate).length > 0 ? (
+                    getGoalsForDate(selectedDate).map((goal) => (
+                      <View key={goal.id} style={styles.goalCard}>
+                        <View style={styles.goalContent}>
+                          <Text style={styles.goalEmoji}>🎯</Text>
+                          <View style={styles.goalInfo}>
+                            <Text style={[styles.goalTitle, goal.is_completed && styles.goalCompleted]}>
+                              {goal.title}
+                            </Text>
+                            {goal.is_completed && (
+                              <Text style={styles.goalStatus}>✓ Completed</Text>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.emptyText}>No goals for this date</Text>
+                  )}
 
                   {isDateInCycle(selectedDate).isInCycle && (
                     <>
@@ -564,5 +636,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2A7DE1',
+  },
+  goalIndicator: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+  },
+  goalIndicatorText: {
+    fontSize: 10,
+  },
+  goalCard: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFD700',
+  },
+  goalContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  goalEmoji: {
+    fontSize: 24,
+  },
+  goalInfo: {
+    flex: 1,
+  },
+  goalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  goalCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  goalStatus: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 16,
   },
 });

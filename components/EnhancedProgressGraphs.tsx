@@ -282,7 +282,7 @@ export function EnhancedProgressGraphs({ strengthTests, workouts, weightUnit, is
             data={enduranceChartData}
             width={CHART_WIDTH}
             height={220}
-            spacing={Math.max(40, CHART_WIDTH / enduranceChartData.length)}
+            spacing={enduranceChartData.length > 1 ? Math.max(50, (CHART_WIDTH - 40) / (enduranceChartData.length - 1)) : CHART_WIDTH - 40}
             initialSpacing={20}
             endSpacing={20}
             color="#10B981"

@@ -19,6 +19,7 @@ export default function Home() {
   const { colors } = useTheme();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [completedGoals, setCompletedGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -32,7 +33,7 @@ export default function Home() {
     if (!profile) return;
 
     try {
-      const [recentWorkouts, allWorkouts, cyclesData] = await Promise.all([
+      const [recentWorkouts, allWorkouts, cyclesData, completedGoalsData] = await Promise.all([
         supabase
           .from('workouts')
           .select('*')
@@ -50,6 +51,13 @@ export default function Home() {
           .order('is_active', { ascending: false })
           .order('start_date', { ascending: false })
           .limit(3),
+        supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', profile.id)
+          .eq('is_completed', true)
+          .order('updated_at', { ascending: false })
+          .limit(3),
       ]);
 
       if (recentWorkouts.data) {
@@ -62,6 +70,10 @@ export default function Home() {
 
       if (cyclesData.data) {
         setCycles(cyclesData.data);
+      }
+
+      if (completedGoalsData.data) {
+        setCompletedGoals(completedGoalsData.data);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -155,9 +167,14 @@ export default function Home() {
       }
     >
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.greeting, { color: colors.textTertiary }]}>Welcome back,</Text>
-          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'Athlete'}</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.logoPlaceholder}>
+            <Text style={styles.logoText}>💪</Text>
+          </View>
+          <View>
+            <Text style={[styles.greeting, { color: colors.textTertiary }]}>Welcome back,</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'Athlete'}</Text>
+          </View>
         </View>
         {isPremium && (
           <View style={[styles.premiumBadge, { backgroundColor: colors.premium }]}>
@@ -232,6 +249,28 @@ export default function Home() {
         </View>
       )}
 
+      {completedGoals.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Completed Goals</Text>
+
+          {completedGoals.map((goal) => (
+            <View key={goal.id} style={[styles.goalCard, { backgroundColor: colors.surface }]}>
+              <View style={styles.goalContent}>
+                <Text style={styles.goalEmoji}>🏆</Text>
+                <View style={styles.goalInfo}>
+                  <Text style={[styles.goalTitle, { color: colors.text }]}>
+                    {goal.title}
+                  </Text>
+                  <Text style={[styles.goalCompleted, { color: '#10B981' }]}>
+                    ✓ Completed
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
 
@@ -290,6 +329,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 60,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  logoPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#2A2A2A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E63946',
+  },
+  logoText: {
+    fontSize: 30,
   },
   greeting: {
     fontSize: 16,
@@ -444,6 +501,33 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 12,
     marginTop: 4,
+    fontWeight: '600',
+  },
+  goalCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFD700',
+  },
+  goalContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  goalEmoji: {
+    fontSize: 24,
+  },
+  goalInfo: {
+    flex: 1,
+  },
+  goalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  goalCompleted: {
+    fontSize: 12,
     fontWeight: '600',
   },
 });
