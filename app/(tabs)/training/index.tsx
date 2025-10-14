@@ -446,7 +446,7 @@ export default function Training() {
                       style={styles.iconButton}
                       onPress={() => handleEditWorkout(workout)}
                     >
-                      <Edit2 size={18} color="#E63946" />
+                      <Pencil size={18} color="#E63946" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.iconButton}

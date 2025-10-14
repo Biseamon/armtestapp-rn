@@ -16,7 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
-import { Plus, X, Save, Edit2, Trash2, ArrowLeft } from 'lucide-react-native';
+import { Plus, X, Save, Pencil, Trash2, ArrowLeft } from 'lucide-react-native';
 import { formatWeight, convertToLbs, convertFromLbs } from '@/lib/weightUtils';
 
 type Exercise = {
@@ -326,7 +326,7 @@ export default function CycleDetails() {
                       style={styles.iconButton}
                       onPress={() => handleEditWorkout(workout)}
                     >
-                      <Edit2 size={18} color="#E63946" />
+                      <Pencil size={18} color="#E63946" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.iconButton}

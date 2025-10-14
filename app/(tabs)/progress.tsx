@@ -20,7 +20,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { EnhancedProgressGraphs } from '@/components/EnhancedProgressGraphs';
 import { ProgressReport } from '@/components/ProgressReport';
 import { Confetti } from '@/components/Confetti';
-import { Plus, Target, X, Save, Trophy, TrendingUp, Calendar, Edit2, Trash2, Activity } from 'lucide-react-native';
+import { Plus, Target, X, Save, Trophy, TrendingUp, Calendar, Pencil, Trash2, Activity } from 'lucide-react-native';
 import { MeasurementsModal } from '@/components/MeasurementsModal';
 import { AddMeasurementModal } from '@/components/AddMeasurementModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -426,7 +426,7 @@ export default function Progress() {
                         style={styles.editButton}
                         onPress={() => handleEditGoal(goal)}
                       >
-                        <Edit2 size={16} color="#2A7DE1" />
+                        <Pencil size={16} color="#2A7DE1" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteButton}
@@ -501,7 +501,7 @@ export default function Progress() {
                       style={styles.editButton}
                       onPress={() => handleEditTest(test)}
                     >
-                      <Edit2 size={16} color="#2A7DE1" />
+                      <Pencil size={16} color="#2A7DE1" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteButton}
