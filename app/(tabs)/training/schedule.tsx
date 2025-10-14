@@ -70,7 +70,10 @@ export default function ScheduleScreen() {
     if (!profile || !title) return;
 
     const timeString = `${selectedTime.getHours().toString().padStart(2, '0')}:${selectedTime.getMinutes().toString().padStart(2, '0')}`;
-    const dateString = selectedDate.toISOString().split('T')[0];
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
 
     let notificationId = null;
     if (notificationEnabled) {
@@ -294,8 +297,12 @@ export default function ScheduleScreen() {
             {Platform.OS === 'web' ? (
               <input
                 type="date"
-                value={selectedDate.toISOString().split('T')[0]}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`}
+                onChange={(e) => {
+                  const [year, month, day] = e.target.value.split('-');
+                  const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                  setSelectedDate(newDate);
+                }}
                 style={{
                   padding: 12,
                   backgroundColor: '#2A2A2A',

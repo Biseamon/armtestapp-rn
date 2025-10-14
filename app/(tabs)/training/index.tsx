@@ -230,13 +230,20 @@ export default function Training() {
   const handleSaveCycle = async () => {
     if (!profile || !cycleName) return;
 
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     if (editingCycle) {
       await supabase.from('cycles').update({
         name: cycleName,
         description: cycleDescription,
         cycle_type: cycleType,
-        start_date: cycleStartDate.toISOString().split('T')[0],
-        end_date: cycleEndDate.toISOString().split('T')[0],
+        start_date: formatDate(cycleStartDate),
+        end_date: formatDate(cycleEndDate),
       }).eq('id', editingCycle.id);
     } else {
       await supabase.from('cycles').insert({
@@ -244,8 +251,8 @@ export default function Training() {
         name: cycleName,
         description: cycleDescription,
         cycle_type: cycleType,
-        start_date: cycleStartDate.toISOString().split('T')[0],
-        end_date: cycleEndDate.toISOString().split('T')[0],
+        start_date: formatDate(cycleStartDate),
+        end_date: formatDate(cycleEndDate),
         is_active: false,
       });
     }
