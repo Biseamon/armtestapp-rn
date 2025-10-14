@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { X, Plus, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type Measurement = {
   id: string;
@@ -20,6 +21,8 @@ type Props = {
 };
 
 export function MeasurementsModal({ visible, onClose, measurements, onAddNew, weightUnit }: Props) {
+  const { colors } = useTheme();
+
   const calculateChange = (current: number | null, previous: number | null) => {
     if (!current || !previous) return null;
     const change = current - previous;
@@ -38,9 +41,9 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Body Measurements</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Body Measurements</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.addButton} onPress={onAddNew}>
               <Plus size={20} color="#FFF" />
@@ -54,14 +57,14 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
         <ScrollView style={styles.content}>
           {measurements.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No measurements yet</Text>
-              <Text style={styles.emptySubtext}>Track your progress by adding measurements</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No measurements yet</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>Track your progress by adding measurements</Text>
             </View>
           ) : (
             measurements.map((measurement, index) => (
-              <View key={measurement.id} style={styles.measurementCard}>
+              <View key={measurement.id} style={[styles.measurementCard, { backgroundColor: colors.surface }]}>
                 <View style={styles.measurementHeader}>
-                  <Text style={styles.measurementDate}>
+                  <Text style={[styles.measurementDate, { color: colors.primary }]}>
                     {new Date(measurement.measured_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -74,9 +77,9 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
                 <View style={styles.measurementGrid}>
                   {measurement.weight && (
                     <View style={styles.measurementItem}>
-                      <Text style={styles.measurementLabel}>Weight</Text>
+                      <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Weight</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={styles.measurementValue}>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>
                           {measurement.weight} {weightUnit}
                         </Text>
                         {getMeasurementChange(index, 'weight') && (
@@ -97,9 +100,9 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
 
                   {measurement.arm_circumference && (
                     <View style={styles.measurementItem}>
-                      <Text style={styles.measurementLabel}>Arm</Text>
+                      <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Arm</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={styles.measurementValue}>{measurement.arm_circumference} cm</Text>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>{measurement.arm_circumference} cm</Text>
                         {getMeasurementChange(index, 'arm_circumference') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'arm_circumference')!.isIncrease ? styles.changeUp : styles.changeDown]}>
                             {getMeasurementChange(index, 'arm_circumference')!.isIncrease ? (
@@ -118,9 +121,9 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
 
                   {measurement.forearm_circumference && (
                     <View style={styles.measurementItem}>
-                      <Text style={styles.measurementLabel}>Forearm</Text>
+                      <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Forearm</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={styles.measurementValue}>{measurement.forearm_circumference} cm</Text>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>{measurement.forearm_circumference} cm</Text>
                         {getMeasurementChange(index, 'forearm_circumference') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'forearm_circumference')!.isIncrease ? styles.changeUp : styles.changeDown]}>
                             {getMeasurementChange(index, 'forearm_circumference')!.isIncrease ? (
@@ -139,9 +142,9 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
 
                   {measurement.wrist_circumference && (
                     <View style={styles.measurementItem}>
-                      <Text style={styles.measurementLabel}>Wrist</Text>
+                      <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Wrist</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={styles.measurementValue}>{measurement.wrist_circumference} cm</Text>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>{measurement.wrist_circumference} cm</Text>
                         {getMeasurementChange(index, 'wrist_circumference') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'wrist_circumference')!.isIncrease ? styles.changeUp : styles.changeDown]}>
                             {getMeasurementChange(index, 'wrist_circumference')!.isIncrease ? (
@@ -160,7 +163,7 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
                 </View>
 
                 {measurement.notes && (
-                  <Text style={styles.measurementNotes}>{measurement.notes}</Text>
+                  <Text style={[styles.measurementNotes, { color: colors.textSecondary }]}>{measurement.notes}</Text>
                 )}
               </View>
             ))

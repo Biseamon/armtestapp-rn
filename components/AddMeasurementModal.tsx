@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { X, Save } from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type Props = {
   visible: boolean;
@@ -34,75 +35,77 @@ export function AddMeasurementModal({
   setNotes,
   weightUnit,
 }: Props) {
+  const { colors } = useTheme();
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Add Measurement</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Add Measurement</Text>
           <TouchableOpacity onPress={onClose}>
             <X size={24} color="#999" />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content}>
-          <Text style={styles.subtitle}>All fields are optional. Enter measurements to track your progress.</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>All fields are optional. Enter measurements to track your progress.</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Weight ({weightUnit})</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Weight ({weightUnit})</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={weight}
               onChangeText={setWeight}
               placeholder={`e.g., ${weightUnit === 'lbs' ? '180' : '80'}`}
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Arm Circumference (cm)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Arm Circumference (cm)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={armCircumference}
               onChangeText={setArmCircumference}
               placeholder="e.g., 35"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Forearm Circumference (cm)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Forearm Circumference (cm)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={forearmCircumference}
               onChangeText={setForearmCircumference}
               placeholder="e.g., 28"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Wrist Circumference (cm)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Wrist Circumference (cm)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={wristCircumference}
               onChangeText={setWristCircumference}
               placeholder="e.g., 17"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Notes (optional)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Notes (optional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={notes}
               onChangeText={setNotes}
               placeholder="Add any notes about this measurement..."
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               multiline
               numberOfLines={4}
             />

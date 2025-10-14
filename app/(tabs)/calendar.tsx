@@ -152,19 +152,19 @@ export default function CalendarScreen() {
   };
 
   const getDayColor = (workoutCount: number, isInCycle: boolean): string => {
-    if (!showWorkouts && !showCycles) return '#2A2A2A';
+    if (!showWorkouts && !showCycles) return colors.surface;
     if (!showWorkouts && isInCycle && showCycles) return '#2A7DE144';
     if (!showCycles && workoutCount > 0 && showWorkouts) {
       if (workoutCount === 1) return '#E6394655';
       if (workoutCount === 2) return '#E6394688';
       if (workoutCount >= 3) return '#E63946';
     }
-    if (workoutCount === 0 && !isInCycle) return '#2A2A2A';
+    if (workoutCount === 0 && !isInCycle) return colors.surface;
     if (isInCycle && workoutCount === 0 && showCycles) return '#2A7DE144';
     if (workoutCount === 1 && showWorkouts) return '#E6394655';
     if (workoutCount === 2 && showWorkouts) return '#E6394688';
     if (workoutCount >= 3 && showWorkouts) return '#E63946';
-    return '#2A2A2A';
+    return colors.surface;
   };
 
   const handleDayPress = (date: Date) => {
@@ -236,6 +236,7 @@ export default function CalendarScreen() {
             <Text
               style={[
                 styles.dayText,
+                { color: workoutCount > 0 ? '#FFF' : colors.text },
                 workoutCount > 0 && styles.dayTextActive,
               ]}
             >
@@ -403,9 +404,9 @@ export default function CalendarScreen() {
         onRequestClose={() => setShowDayModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {selectedDate?.toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -421,7 +422,7 @@ export default function CalendarScreen() {
             <ScrollView style={styles.modalContent}>
               {selectedDate && (
                 <>
-                  <Text style={styles.modalSectionTitle}>
+                  <Text style={[styles.modalSectionTitle, { color: colors.text }]}>
                     Workouts ({getWorkoutsForDate(selectedDate).length})
                   </Text>
                   {getWorkoutsForDate(selectedDate).map((workout) => (
@@ -459,34 +460,34 @@ export default function CalendarScreen() {
                     </View>
                   ))}
 
-                  <Text style={styles.modalSectionTitle}>
+                  <Text style={[styles.modalSectionTitle, { color: colors.text }]}>
                     Goals ({getGoalsForDate(selectedDate).length})
                   </Text>
                   {getGoalsForDate(selectedDate).length > 0 ? (
                     getGoalsForDate(selectedDate).map((goal) => (
-                      <View key={goal.id} style={styles.goalCard}>
+                      <View key={goal.id} style={[styles.goalCard, { backgroundColor: colors.surface }]}>
                         <View style={styles.goalContent}>
                           <Text style={styles.goalEmoji}>🎯</Text>
                           <View style={styles.goalInfo}>
-                            <Text style={[styles.goalTitle, goal.is_completed && styles.goalCompleted]}>
+                            <Text style={[styles.goalTitle, { color: colors.primary }, goal.is_completed && styles.goalCompleted]}>
                               {goal.goal_type}
                             </Text>
                             {goal.is_completed && (
-                              <Text style={styles.goalStatus}>✓ Completed</Text>
+                              <Text style={[styles.goalStatus, { color: colors.success }]}>✓ Completed</Text>
                             )}
                           </View>
                         </View>
                       </View>
                     ))
                   ) : (
-                    <Text style={styles.emptyText}>No goals for this date</Text>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No goals for this date</Text>
                   )}
 
                   {isDateInCycle(selectedDate).isInCycle && (
                     <>
-                      <Text style={styles.modalSectionTitle}>Training Cycle</Text>
-                      <View style={styles.cycleCard}>
-                        <Text style={styles.cycleName}>
+                      <Text style={[styles.modalSectionTitle, { color: colors.text }]}>Training Cycle</Text>
+                      <View style={[styles.cycleCard, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.cycleName, { color: colors.primary }]}>
                           {isDateInCycle(selectedDate).cycleName}
                         </Text>
                       </View>
