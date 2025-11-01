@@ -51,7 +51,8 @@ export default function CalendarScreen() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
@@ -65,14 +66,14 @@ export default function CalendarScreen() {
         fetchData();
       }
       return () => {};
-    }, [profile, selectedYear])
+    }, [profile, currentYear])
   );
 
   const fetchData = async () => {
     if (!profile) return;
 
-    const startDate = `${selectedYear}-01-01`;
-    const endDate = `${selectedYear}-12-31`;
+    const startDate = `${currentYear}-01-01`;
+    const endDate = `${currentYear}-12-31`;
 
     const [workoutsRes, cyclesRes, goalsRes, profileRes] = await Promise.all([
       supabase
@@ -176,6 +177,34 @@ export default function CalendarScreen() {
     }
   };
 
+  const handlePreviousMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    const today = new Date();
+    const isCurrentMonth = currentMonth === today.getMonth() && currentYear === today.getFullYear();
+
+    if (!isCurrentMonth) {
+      if (currentMonth === 11) {
+        setCurrentMonth(0);
+        setCurrentYear(currentYear + 1);
+      } else {
+        setCurrentMonth(currentMonth + 1);
+      }
+    }
+  };
+
+  const canGoForward = () => {
+    const today = new Date();
+    return !(currentMonth === today.getMonth() && currentYear === today.getFullYear());
+  };
+
   const handleDeleteWorkout = async (workoutId: string) => {
     if (Platform.OS === 'web') {
       if (window.confirm('Are you sure you want to delete this workout?')) {
@@ -191,79 +220,119 @@ export default function CalendarScreen() {
   };
 
   const renderCalendar = () => {
-    const months = [];
     const screenWidth = Dimensions.get('window').width;
     const daySize = Math.floor((screenWidth - 60) / 7);
 
-    for (let month = 0; month < 12; month++) {
-      const firstDay = new Date(selectedYear, month, 1);
-      const lastDay = new Date(selectedYear, month + 1, 0);
-      const daysInMonth = lastDay.getDate();
-      const startingDayOfWeek = firstDay.getDay();
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
 
-      const days = [];
-      for (let i = 0; i < startingDayOfWeek; i++) {
-        days.push(
-          <View
-            key={`empty-${i}`}
-            style={[styles.day, { width: daySize, height: daySize }]}
-          />
-        );
-      }
+    const days = [];
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(selectedYear, month, day);
-        const workoutCount = getWorkoutCountForDate(date);
-        const goalCount = getGoalCountForDate(date);
-        const { isInCycle, cycleName } = isDateInCycle(date);
-        const dayColor = getDayColor(workoutCount, isInCycle);
+    // Day headers
+    const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const headers = dayHeaders.map((dayName, index) => (
+      <View
+        key={`header-${index}`}
+        style={[styles.dayHeader, { width: daySize }]}
+      >
+        <Text style={[styles.dayHeaderText, { color: colors.textSecondary }]}>
+          {dayName}
+        </Text>
+      </View>
+    ));
 
-        days.push(
-          <TouchableOpacity
-            key={day}
-            style={[
-              styles.day,
-              {
-                width: daySize,
-                height: daySize,
-                backgroundColor: dayColor,
-                borderWidth: isInCycle && showCycles ? 2 : 0,
-                borderColor: '#2A7DE1',
-              },
-            ]}
-            onPress={() => handleDayPress(date)}
-          >
-            <Text
-              style={[
-                styles.dayText,
-                { color: workoutCount > 0 ? '#FFF' : colors.text },
-                workoutCount > 0 && styles.dayTextActive,
-              ]}
-            >
-              {day}
-            </Text>
-            {goalCount > 0 && showGoals && (
-              <View style={styles.goalIndicator}>
-                <Text style={styles.goalIndicatorText}>🎯</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      }
-
-      months.push(
-        <View key={month} style={styles.monthContainer}>
-          <Text style={[styles.monthTitle, { color: colors.text }]}>
-            {new Date(selectedYear, month).toLocaleString('default', {
-              month: 'long',
-            })}
-          </Text>
-          <View style={styles.daysContainer}>{days}</View>
-        </View>
+    // Empty cells before first day of month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(
+        <View
+          key={`empty-${i}`}
+          style={[styles.day, { width: daySize, height: daySize }]}
+        />
       );
     }
 
-    return months;
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentYear, currentMonth, day);
+      const workoutCount = getWorkoutCountForDate(date);
+      const goalCount = getGoalCountForDate(date);
+      const { isInCycle, cycleName } = isDateInCycle(date);
+      const dayColor = getDayColor(workoutCount, isInCycle);
+
+      const today = new Date();
+      const isToday = date.getDate() === today.getDate() &&
+                      date.getMonth() === today.getMonth() &&
+                      date.getFullYear() === today.getFullYear();
+
+      days.push(
+        <TouchableOpacity
+          key={day}
+          style={[
+            styles.day,
+            {
+              width: daySize,
+              height: daySize,
+              backgroundColor: dayColor,
+              borderWidth: isInCycle && showCycles ? 2 : isToday ? 2 : 0,
+              borderColor: isToday ? colors.primary : '#2A7DE1',
+            },
+          ]}
+          onPress={() => handleDayPress(date)}
+        >
+          <Text
+            style={[
+              styles.dayText,
+              { color: workoutCount > 0 ? '#FFF' : colors.text },
+              workoutCount > 0 && styles.dayTextActive,
+              isToday && !workoutCount && { color: colors.primary, fontWeight: 'bold' },
+            ]}
+          >
+            {day}
+          </Text>
+          {goalCount > 0 && showGoals && (
+            <View style={styles.goalIndicator}>
+              <Text style={styles.goalIndicatorText}>🎯</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={styles.calendarContainer}>
+        <View style={styles.monthHeader}>
+          <TouchableOpacity
+            onPress={handlePreviousMonth}
+            style={styles.monthNavButton}
+          >
+            <ChevronLeft size={28} color={colors.text} />
+          </TouchableOpacity>
+
+          <Text style={[styles.monthYearTitle, { color: colors.text }]}>
+            {new Date(currentYear, currentMonth).toLocaleString('default', {
+              month: 'long',
+              year: 'numeric',
+            })}
+          </Text>
+
+          <TouchableOpacity
+            onPress={handleNextMonth}
+            disabled={!canGoForward()}
+            style={styles.monthNavButton}
+          >
+            <ChevronRight
+              size={28}
+              color={canGoForward() ? colors.text : colors.border}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.dayHeadersContainer}>{headers}</View>
+        <View style={styles.daysContainer}>{days}</View>
+      </View>
+    );
   };
 
   const getWorkoutsForDate = (date: Date) => {
@@ -278,40 +347,6 @@ export default function CalendarScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Calendar</Text>
-      </View>
-
-      <View style={styles.yearSelector}>
-        <TouchableOpacity
-          onPress={() =>
-            setSelectedYear((y) => Math.max(y - 1, availableYears[0] || 2020))
-          }
-          disabled={selectedYear <= (availableYears[0] || 2020)}
-        >
-          <ChevronLeft
-            size={24}
-            color={
-              selectedYear <= (availableYears[0] || 2020) ? '#333' : '#FFF'
-            }
-          />
-        </TouchableOpacity>
-        <Text style={[styles.yearText, { color: colors.text }]}>
-          {selectedYear}
-        </Text>
-        <TouchableOpacity
-          onPress={() =>
-            setSelectedYear((y) =>
-              Math.min(y + 1, new Date().getFullYear())
-            )
-          }
-          disabled={selectedYear >= new Date().getFullYear()}
-        >
-          <ChevronRight
-            size={24}
-            color={
-              selectedYear >= new Date().getFullYear() ? '#333' : '#FFF'
-            }
-          />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.filterContainer}>
@@ -390,12 +425,9 @@ export default function CalendarScreen() {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
+      <View style={styles.content}>
         {renderCalendar()}
-      </ScrollView>
+      </View>
 
       <Modal
         visible={showDayModal}
@@ -515,17 +547,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
   },
-  yearSelector: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 24,
-    paddingVertical: 16,
-  },
-  yearText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
   filterContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -576,14 +597,41 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    justifyContent: 'center',
   },
-  monthContainer: {
-    marginBottom: 24,
+  calendarContainer: {
+    paddingVertical: 20,
   },
-  monthTitle: {
-    fontSize: 18,
+  monthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+  monthNavButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  monthYearTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 12,
+    flex: 1,
+    textAlign: 'center',
+  },
+  dayHeadersContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    gap: 4,
+  },
+  dayHeader: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  dayHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   daysContainer: {
     flexDirection: 'row',
