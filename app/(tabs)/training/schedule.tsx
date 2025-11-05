@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
   Platform,
+  useColorScheme,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +34,8 @@ interface ScheduledTraining {
 export default function ScheduleScreen() {
   const { profile } = useAuth();
   const { colors } = useTheme();
+  const colorScheme = useColorScheme();
+
   const [trainings, setTrainings] = useState<ScheduledTraining[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingTraining, setEditingTraining] = useState<ScheduledTraining | null>(null);
@@ -321,9 +324,9 @@ export default function ScheduleScreen() {
               <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowDatePicker(true)}
+                  onPress={() => setShowDatePicker(!showDatePicker)}
                 >
-                  <Calendar size={20} color="#FFF" />
+                  <Calendar size={20} color={showDatePicker ? '#E63946' : '#FFF'} />
                   <Text style={styles.dateButtonText}>
                     {selectedDate.toLocaleDateString()}
                   </Text>
@@ -333,10 +336,19 @@ export default function ScheduleScreen() {
                   <DateTimePicker
                     value={selectedDate}
                     mode="date"
-                    display="default"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
+                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
                     onChange={(event, date) => {
-                      setShowDatePicker(Platform.OS === 'ios');
-                      if (date) setSelectedDate(date);
+                      if (Platform.OS === 'android') {
+                        setShowDatePicker(false);
+                      }
+                      
+                      if (event.type === 'set' && date) {
+                        setSelectedDate(date);
+                      } else if (event.type === 'dismissed') {
+                        setShowDatePicker(false);
+                      }
                     }}
                   />
                 )}
@@ -368,9 +380,9 @@ export default function ScheduleScreen() {
               <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowTimePicker(true)}
+                  onPress={() => setShowTimePicker(!showTimePicker)}
                 >
-                  <Clock size={20} color="#FFF" />
+                  <Clock size={20} color={showTimePicker ? '#E63946' : '#FFF'} />
                   <Text style={styles.dateButtonText}>
                     {selectedTime.toLocaleTimeString([], {
                       hour: '2-digit',
@@ -383,10 +395,20 @@ export default function ScheduleScreen() {
                   <DateTimePicker
                     value={selectedTime}
                     mode="time"
-                    display="default"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
+                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'} // Add accent color
                     onChange={(event, time) => {
-                      setShowTimePicker(Platform.OS === 'ios');
-                      if (time) setSelectedTime(time);
+                      if (Platform.OS === 'android') {
+                        setShowTimePicker(false);
+                      }
+                      
+                      if (event.type === 'set' && time) {
+                        setSelectedTime(time);
+                      } else if (event.type === 'dismissed') {
+                        setShowTimePicker(false);
+                      }
                     }}
                   />
                 )}

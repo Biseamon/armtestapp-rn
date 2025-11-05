@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   Platform,
+  useColorScheme, // Add this import
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +32,7 @@ type Exercise = {
 export default function Training() {
   const { profile, isPremium } = useAuth();
   const { colors } = useTheme();
+  const colorScheme = useColorScheme(); // Add this line
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
@@ -66,7 +68,7 @@ export default function Training() {
 
   const fetchData = async () => {
     if (!profile) return;
-
+  
     const [workoutsRes, cyclesRes, countRes] = await Promise.all([
       supabase
         .from('workouts')
@@ -83,7 +85,9 @@ export default function Training() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', profile.id),
     ]);
-
+  
+    console.log('Cycles response:', { data: cyclesRes.data, error: cyclesRes.error }); // Add this
+    
     if (workoutsRes.data) setWorkouts(workoutsRes.data);
     if (cyclesRes.data) setCycles(cyclesRes.data);
     setWorkoutCount(countRes.count || 0);
@@ -102,20 +106,23 @@ export default function Training() {
   const handleEditWorkout = async (workout: Workout) => {
     setEditingWorkout(workout);
     setWorkoutType(workout.workout_type);
-    setDuration(String(workout.duration_minutes));
-    setIntensity(String(workout.intensity));
-    setNotes(workout.notes);
+    setDuration(workout.duration_minutes?.toString() || '');
+    setIntensity(workout.intensity?.toString() || '');
+    setNotes(workout.notes || '');
     setSelectedCycleId(workout.cycle_id);
-
-    const { data: exercisesData } = await supabase
+    
+    // Load exercises for this workout
+    const { data: exercisesData, error } = await supabase
       .from('exercises')
       .select('*')
       .eq('workout_id', workout.id);
-
-    if (exercisesData) {
-      setExercises(exercisesData);
+    
+    if (error) {
+      console.error('Error loading exercises:', error);
+    } else {
+      setExercises(exercisesData || []);
     }
-
+    
     setShowWorkoutModal(true);
   };
 
@@ -154,61 +161,87 @@ export default function Training() {
     setExercises(updated);
   };
 
+  // In your index.tsx file where handleSaveWorkout is defined
   const handleSaveWorkout = async () => {
-    if (!profile) return;
-
-    setSaving(true);
-
-    if (editingWorkout) {
-      const { error: updateError } = await supabase
-        .from('workouts')
-        .update({
-          workout_type: workoutType,
-          duration_minutes: parseInt(duration) || 0,
-          intensity: parseInt(intensity) || 5,
-          notes,
-          cycle_id: selectedCycleId,
-        })
-        .eq('id', editingWorkout.id);
-
-      if (!updateError) {
-        await supabase.from('exercises').delete().eq('workout_id', editingWorkout.id);
-
-        if (exercises.length > 0) {
-          const exercisesData = exercises.map((ex) => ({
-            workout_id: editingWorkout.id,
-            ...ex,
-          }));
-          await supabase.from('exercises').insert(exercisesData);
-        }
-      }
-    } else {
-      const { data: workout, error: workoutError } = await supabase
-        .from('workouts')
-        .insert({
-          user_id: profile.id,
-          workout_type: workoutType,
-          duration_minutes: parseInt(duration) || 0,
-          intensity: parseInt(intensity) || 5,
-          notes,
-          cycle_id: selectedCycleId,
-        })
-        .select()
-        .single();
-
-      if (!workoutError && workout && exercises.length > 0) {
-        const exercisesData = exercises.map((ex) => ({
-          workout_id: workout.id,
-          ...ex,
-        }));
-        await supabase.from('exercises').insert(exercisesData);
-      }
+    if (!profile) {
+      console.log('No profile found');
+      return;
     }
-
-    setSaving(false);
-    setShowWorkoutModal(false);
-    resetForm();
-    fetchData();
+    
+    setSaving(true);
+    console.log('Starting save workout...'); // Debug log
+  
+    try {
+      let workoutId: string;
+  
+      if (editingWorkout) {
+        // Update existing workout
+        const { error: workoutError } = await supabase
+          .from('workouts')
+          .update({
+            workout_type: workoutType,
+            duration_minutes: parseInt(duration) || 0,
+            intensity: parseInt(intensity) || 5,
+            notes,
+            cycle_id: selectedCycleId,
+          })
+          .eq('id', editingWorkout.id);
+        
+        if (workoutError) throw workoutError;
+        workoutId = editingWorkout.id;
+  
+        // Delete existing exercises for this workout
+        await supabase
+          .from('exercises')
+          .delete()
+          .eq('workout_id', workoutId);
+        
+      } else {
+        // Create new workout
+        const { data: workoutData, error: workoutError } = await supabase
+          .from('workouts')
+          .insert({
+            user_id: profile.id,
+            workout_type: workoutType,
+            duration_minutes: parseInt(duration) || 0,
+            intensity: parseInt(intensity) || 5,
+            notes,
+            cycle_id: selectedCycleId,
+          })
+          .select()
+          .single();
+        
+        if (workoutError) throw workoutError;
+        workoutId = workoutData.id;
+      }
+  
+      // Insert exercises if any exist
+      if (exercises.length > 0) {
+        const exercisesToInsert = exercises.map(exercise => ({
+          workout_id: workoutId,
+          exercise_name: exercise.exercise_name,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          weight_lbs: exercise.weight_lbs,
+          notes: exercise.notes || '',
+        }));
+  
+        const { error: exercisesError } = await supabase
+          .from('exercises')
+          .insert(exercisesToInsert);
+        
+        if (exercisesError) throw exercisesError;
+      }
+      
+      setShowWorkoutModal(false);
+      resetForm();
+      await fetchData(); // Refresh the list
+    } catch (error) {
+      console.error('Error saving workout:', error);
+      Alert.alert('Error', 'Failed to save workout');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddCycle = () => {
@@ -752,7 +785,7 @@ export default function Training() {
               <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowStartDatePicker(true)}
+                  onPress={() => setShowStartDatePicker(!showStartDatePicker)}
                 >
                   <Text style={styles.dateButtonText}>
                     {cycleStartDate.toLocaleDateString('en-US', {
@@ -761,17 +794,28 @@ export default function Training() {
                       day: 'numeric',
                     })}
                   </Text>
-                  <CalendarIcon size={20} color="#999" />
+                  <CalendarIcon size={20} color={showStartDatePicker ? '#E63946' : '#999'} />
                 </TouchableOpacity>
                 {showStartDatePicker && (
                   <DateTimePicker
                     value={cycleStartDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'} // Ensure it's either 'dark' or 'light'
+                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, selectedDate) => {
-                      setShowStartDatePicker(Platform.OS === 'ios');
-                      if (selectedDate) {
+                      // Hide picker on Android after selection
+                      if (Platform.OS === 'android') {
+                        setShowStartDatePicker(false);
+                      }
+                      
+                      // Only update date if user didn't cancel
+                      if (event.type === 'set' && selectedDate) {
                         setCycleStartDate(selectedDate);
+                      } else if (event.type === 'dismissed') {
+                        // User cancelled, just hide the picker
+                        setShowStartDatePicker(false);
                       }
                     }}
                   />
@@ -804,7 +848,7 @@ export default function Training() {
               <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowEndDatePicker(true)}
+                  onPress={() => setShowEndDatePicker(!showEndDatePicker)}
                 >
                   <Text style={styles.dateButtonText}>
                     {cycleEndDate.toLocaleDateString('en-US', {
@@ -813,17 +857,28 @@ export default function Training() {
                       day: 'numeric',
                     })}
                   </Text>
-                  <CalendarIcon size={20} color="#999" />
+                  <CalendarIcon size={20} color={showEndDatePicker ? '#E63946' : '#999'} />
                 </TouchableOpacity>
                 {showEndDatePicker && (
                   <DateTimePicker
                     value={cycleEndDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'} // Ensure it's either 'dark' or 'light'
+                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, selectedDate) => {
-                      setShowEndDatePicker(Platform.OS === 'ios');
-                      if (selectedDate) {
+                      // Hide picker on Android after selection
+                      if (Platform.OS === 'android') {
+                        setShowEndDatePicker(false);
+                      }
+                      
+                      // Only update date if user didn't cancel
+                      if (event.type === 'set' && selectedDate) {
                         setCycleEndDate(selectedDate);
+                      } else if (event.type === 'dismissed') {
+                        // User cancelled, just hide the picker
+                        setShowEndDatePicker(false);
                       }
                     }}
                   />

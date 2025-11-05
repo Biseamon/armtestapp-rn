@@ -6,6 +6,7 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
+  useColorScheme, // Add this import
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +18,7 @@ import { Calendar, TrendingUp, Target, Clock } from 'lucide-react-native';
 export default function Home() {
   const { profile, isPremium } = useAuth();
   const { colors } = useTheme();
+  const colorScheme = useColorScheme(); // Add this line
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [completedGoals, setCompletedGoals] = useState<any[]>([]);
@@ -29,6 +31,11 @@ export default function Home() {
     totalMinutes: 0,
     avgIntensity: 0,
   });
+
+  // Add this useEffect to log theme changes (optional, for debugging)
+  useEffect(() => {
+    console.log('Current theme:', colorScheme);
+  }, [colorScheme]);
 
   const fetchWorkouts = async () => {
     if (!profile) return;
@@ -70,6 +77,8 @@ export default function Home() {
           .limit(5),
       ]);
 
+      console.log('Cycles fetched:', cyclesData); // Add this debug log
+
       if (recentWorkouts.data) {
         setWorkouts(recentWorkouts.data);
       }
@@ -80,6 +89,7 @@ export default function Home() {
 
       if (cyclesData.data) {
         setCycles(cyclesData.data);
+        console.log('Cycles set:', cyclesData.data); // Add this debug log
       }
 
       if (completedGoalsData.data) {

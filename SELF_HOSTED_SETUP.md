@@ -31,7 +31,7 @@ After installation, you'll need:
 - **Supabase URL**: Usually `https://your-server.com:8000` (or your custom port)
 - **Anon Key**: Public API key (from Supabase dashboard)
 - **Service Role Key**: Admin API key (from Supabase dashboard)
-- **PostgreSQL Connection String**: Database connection details
+- **c Connection String**: Database connection details
 
 ### 3. Run Database Migrations
 

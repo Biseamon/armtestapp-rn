@@ -13,6 +13,7 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Load Supabase credentials from environment variables
 // Supports both Expo config (app.json) and .env file
@@ -33,18 +34,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * - autoRefreshToken: Automatically refresh expired tokens
  * - persistSession: Save session to local storage
  * - detectSessionInUrl: Disabled (not needed for mobile)
- * - storage: Uses localStorage on web, AsyncStorage on mobile
+ * - storage: Uses AsyncStorage for React Native
  * - storageKey: Custom key for storing session data
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,      // Keep user logged in
-    persistSession: true,         // Remember session across app restarts
-    detectSessionInUrl: false,    // Not needed for mobile apps
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    storageKey: 'armwrestling-auth',  // Custom storage key
-  },
-});
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+      storage: AsyncStorage,
+      storageKey: 'armwrestling-auth',
+      debug: true, // Add this to see auth debug logs
+    },
+  }
+);
 
 /**
  * Database Type Definitions
@@ -133,10 +139,25 @@ export type Cycle = {
   id: string;              // Unique cycle ID
   user_id: string;         // Owner's user ID
   name: string;            // Cycle name (e.g., "Competition Prep 2024")
-  description: string;     // Optional cycle description
+  description?: string;     // Optional cycle description
   cycle_type: string;      // Type: strength, technique, recovery, etc.
   start_date: string;      // Cycle start date
   end_date: string;        // Cycle end date
   is_active: boolean;      // Whether this is the current active cycle
   created_at: string;      // When cycle was created
+};
+
+
+export type ScheduledTraining = {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  scheduled_date: string;
+  scheduled_time: string;
+  notification_enabled: boolean;
+  notification_minutes_before: number;
+  notification_id: string | null;
+  completed: boolean;
+  created_at: string;
 };
