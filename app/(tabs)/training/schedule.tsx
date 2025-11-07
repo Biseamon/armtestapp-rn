@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   useColorScheme,
+  Alert,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -191,13 +192,24 @@ export default function ScheduleScreen() {
         fetchTrainings();
       }
     } else {
-      if (window.confirm('Are you sure you want to delete this scheduled training?')) {
-        if (training.notification_id) {
-          await cancelNotification(training.notification_id);
-        }
-        await supabase.from('scheduled_trainings').delete().eq('id', training.id);
-        fetchTrainings();
-      }
+      Alert.alert(
+        'Delete Training',
+        'Are you sure you want to delete this scheduled training?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              if (training.notification_id) {
+                await cancelNotification(training.notification_id);
+              }
+              await supabase.from('scheduled_trainings').delete().eq('id', training.id);
+              fetchTrainings();
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -597,6 +609,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 16,
   },
   dateButtonText: {
     fontSize: 16,

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Workout, StrengthTest, BodyMeasurement, Cycle } from '@/lib/supabase';
 import { formatWeight } from '@/lib/weightUtils';
 import { convertWeight } from '@/lib/weightUtils'
+import { convertCircumference, getCircumferenceUnit } from '@/lib/weightUtils';
 import { Lock, Info, X } from 'lucide-react-native';
 
 interface EnhancedProgressGraphsProps {
@@ -34,6 +35,10 @@ export function EnhancedProgressGraphs({
   const [showTooltip, setShowTooltip] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<typeof trainingLogsData[0] | null>(null);
   const [showCycleDetails, setShowCycleDetails] = useState(false);
+  
+  // New states for data point selection
+  const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null);
+  const [showDataPointModal, setShowDataPointModal] = useState(false);
 
   const screenWidth = Dimensions.get('window').width - 40;
 
@@ -128,10 +133,18 @@ export function EnhancedProgressGraphs({
     return testsByType;
   };
 
-    const prDataByType = getPRTimeline();
-    const prTypes = Object.keys(prDataByType);
-    const [selectedPRType, setSelectedPRType] = useState(prTypes[0] || 'max_wrist_curl');
-    const prData = prDataByType[selectedPRType] || [];
+  const prDataByType = getPRTimeline();
+  const prTypes = Object.keys(prDataByType);
+  const [selectedPRType, setSelectedPRType] = useState(prTypes[0] || 'max_wrist_curl');
+
+  // Effect to update selectedPRType when strengthTests change or isPremium becomes true
+  useEffect(() => {
+    if (isPremium && prTypes.length > 0 && !prTypes.includes(selectedPRType)) {
+      setSelectedPRType(prTypes[0]);
+    }
+  }, [isPremium, strengthTests, prTypes.length]);
+
+  const prData = prDataByType[selectedPRType] || [];
 
     // Get the absolute latest PR for the selected type - FIXED
     const getLatestPR = () => {
@@ -209,15 +222,14 @@ export function EnhancedProgressGraphs({
       if (measurementType === 'weight') {
         const weightValue = m.weight!;
         const storedUnit = m.weight_unit || 'lbs';
-        
-        // Convert from stored unit to user's current preference
         return Math.round(convertWeight(weightValue, storedUnit, weightUnit));
       }
-      // Circumferences are always in cm, no conversion needed
-      if (measurementType === 'arm') return m.arm_circumference!;
-      if (measurementType === 'forearm') return m.forearm_circumference!;
-      if (measurementType === 'wrist') return m.wrist_circumference!;
-      return 0;
+      // Circumferences - convert and round if in inches
+      const circumferenceValue = measurementType === 'arm' ? m.arm_circumference! :
+                                 measurementType === 'forearm' ? m.forearm_circumference! :
+                                 m.wrist_circumference!;
+      const converted = convertCircumference(circumferenceValue, weightUnit);
+      return weightUnit === 'lbs' ? Math.round(converted) : converted;
     });
 
     return { labels, values, measurements: sortedMeasurements };
@@ -473,6 +485,57 @@ export function EnhancedProgressGraphs({
     );
   };
 
+  // Render data point detail modal
+  const renderDataPointModal = () => {
+    if (!selectedDataPoint) return null;
+
+    return (
+      <Modal
+        visible={showDataPointModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDataPointModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.tooltipModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDataPointModal(false)}
+        >
+          <View style={[styles.dataPointModal, { backgroundColor: colors.surface }]}>
+            <View style={styles.tooltipHeader}>
+              <Text style={[styles.tooltipTitle, { color: colors.text }]}>
+                {selectedDataPoint.title}
+              </Text>
+              <TouchableOpacity onPress={() => setShowDataPointModal(false)}>
+                <X size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.dataPointContent}>
+              {selectedDataPoint.details.map((detail: any, index: number) => (
+                <View key={index} style={styles.dataPointRow}>
+                  <Text style={[styles.dataPointLabel, { color: colors.textSecondary }]}>
+                    {detail.label}:
+                  </Text>
+                  <Text style={[styles.dataPointValue, { color: colors.text }]}>
+                    {detail.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            
+            <TouchableOpacity 
+              style={[styles.dataPointCloseButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowDataPointModal(false)}
+            >
+              <Text style={styles.dataPointCloseButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   if (workouts.length === 0 && strengthTests.length === 0 && measurements.length === 0 && cycles.length === 0) {
     return (
       <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
@@ -487,6 +550,7 @@ export function EnhancedProgressGraphs({
     <View style={styles.container}>
       {renderTooltipModal()}
       {renderCycleDetailsModal()}
+      {renderDataPointModal()}
       
       {/* Graph Type Selector */}
       <ScrollView 
@@ -556,32 +620,85 @@ export function EnhancedProgressGraphs({
               <Info size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+          
+          <Text style={[styles.graphHint, { color: colors.textSecondary }]}>
+            👆 Tap any bar to see details
+          </Text>
+          
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={true}
-            contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
             contentOffset={{ x: Math.max(0, (frequencyWeeks.length * 60) - screenWidth + 100), y: 0 }}
           >
-            <BarChart
-              data={{
-                labels: frequencyLabels,
-                datasets: [{ data: frequencyValues.length > 0 ? frequencyValues : [0] }],
-              }}
-              width={getChartWidth(frequencyWeeks.length)}
-              height={220}
-              chartConfig={getChartConfig('frequency')}
-              style={styles.chart}
-              withInnerLines={true}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              fromZero={true}
-              showBarTops={true}
-              showValuesOnTopOfBars={true}
-              yAxisLabel=""
-              yAxisSuffix=""
-            />
+            <View>
+              <BarChart
+                data={{
+                  labels: frequencyLabels,
+                  datasets: [{ data: frequencyValues.length > 0 ? frequencyValues : [0] }],
+                }}
+                width={getChartWidth(frequencyWeeks.length)}
+                height={220}
+                chartConfig={getChartConfig('frequency')}
+                style={styles.chart}
+                withInnerLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                fromZero={true}
+                showBarTops={true}
+                showValuesOnTopOfBars={true}
+                yAxisLabel=""
+                yAxisSuffix=""
+              />
+              
+              <View style={styles.chartTouchableOverlay}>
+                {frequencyWeeks.map((week, index) => {
+                  const barWidth = getChartWidth(frequencyWeeks.length) / frequencyWeeks.length;
+                  const leftOffset = index * barWidth;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.barTouchArea, {
+                        left: leftOffset,
+                        width: barWidth,
+                      }]}
+                      onPress={() => {
+                          const now = new Date();
+                          const weekStart = new Date(now);
+                          weekStart.setDate(now.getDate() - ((11 - index) * 7 + 6));
+                          const weekEnd = new Date(now);
+                          weekEnd.setDate(now.getDate() - ((11 - index) * 7));
+                          
+                          const weekWorkouts = workouts.filter(w => {
+                            const workoutDate = new Date(w.created_at);
+                            return workoutDate >= weekStart && workoutDate <= weekEnd;
+                          });
+                          
+                          const weekPRs = strengthTests.filter(t => {
+                            const testDate = new Date(t.created_at);
+                            return testDate >= weekStart && testDate <= weekEnd;
+                          });
+                          
+                          setSelectedDataPoint({
+                            title: `${week.label} - Week Details`,
+                            details: [
+                              { label: 'Date Range', value: `${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}` },
+                              { label: 'Total Sessions', value: week.count },
+                              { label: 'Workouts', value: weekWorkouts.length },
+                              { label: 'PR Tests', value: weekPRs.length },
+                              { label: 'Avg per Day', value: (week.count / 7).toFixed(1) }
+                            ]
+                          });
+                          setShowDataPointModal(true);
+                        }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
+          
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>This Week</Text>
@@ -619,33 +736,70 @@ export function EnhancedProgressGraphs({
               <Info size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+          
+          <Text style={[styles.graphHint, { color: colors.textSecondary }]}>
+            👆 Tap any point to see workout details
+          </Text>
+          
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={true}
             contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
           >
-            <LineChart
-              data={{
-                labels: durationLabels,
-                datasets: [{ data: durationValues.length > 0 ? durationValues : [0] }],
-              }}
-              width={getChartWidth(durationData.length)}
-              height={220}
-              chartConfig={getChartConfig('duration')}
-              bezier
-              style={styles.chart}
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={true}
-              withHorizontalLines={true}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              withDots={true}
-              withShadow={false}
-              fromZero={false}
-              segments={4}
-            />
+            <View>
+              <LineChart
+                data={{
+                  labels: durationLabels,
+                  datasets: [{ data: durationValues.length > 0 ? durationValues : [0] }],
+                }}
+                width={getChartWidth(durationData.length)}
+                height={220}
+                chartConfig={getChartConfig('duration')}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={true}
+                withVerticalLines={true}
+                withHorizontalLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                withDots={true}
+                withShadow={false}
+                fromZero={false}
+                segments={4}
+              />
+              
+              <View style={styles.chartTouchableOverlay}>
+                {durationData.map((workout, index) => {
+                  const pointWidth = getChartWidth(durationData.length) / durationData.length;
+                  const leftOffset = index * pointWidth;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={workout.id}
+                      style={[styles.pointTouchArea, {
+                        left: leftOffset,
+                        width: pointWidth,
+                      }]}
+                      onPress={() => {
+                        setSelectedDataPoint({
+                          title: `Workout #${durationData.length - index}`,
+                          details: [
+                            { label: 'Date', value: new Date(workout.created_at).toLocaleDateString() },
+                            { label: 'Duration', value: `${workout.duration_minutes} minutes` },
+                            { label: 'Intensity', value: `${workout.intensity || 'N/A'}/10` },
+                            { label: 'Type', value: workout.workout_type || 'General' },
+                            { label: 'Notes', value: workout.notes || 'No notes' }
+                          ]
+                        });
+                        setShowDataPointModal(true);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -684,34 +838,71 @@ export function EnhancedProgressGraphs({
               <Info size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+          
+          <Text style={[styles.graphHint, { color: colors.textSecondary }]}>
+            👆 Tap any point to see workout details
+          </Text>
+          
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={true}
             contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
           >
-            <LineChart
-              data={{
-                labels: intensityLabels,
-                datasets: [{ data: intensityValues.length > 0 ? intensityValues : [0] }],
-              }}
-              width={getChartWidth(intensityData.length)}
-              height={220}
-              chartConfig={getChartConfig('intensity')}
-              bezier
-              style={styles.chart}
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={true}
-              withHorizontalLines={true}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              withDots={true}
-              withShadow={false}
-              fromZero={true}
-              segments={4}
-              yAxisSuffix="/10"
-            />
+            <View>
+              <LineChart
+                data={{
+                  labels: intensityLabels,
+                  datasets: [{ data: intensityValues.length > 0 ? intensityValues : [0] }],
+                }}
+                width={getChartWidth(intensityData.length)}
+                height={220}
+                chartConfig={getChartConfig('intensity')}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={true}
+                withVerticalLines={true}
+                withHorizontalLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                withDots={true}
+                withShadow={false}
+                fromZero={true}
+                segments={4}
+                yAxisSuffix="/10"
+              />
+              
+              <View style={styles.chartTouchableOverlay}>
+                {intensityData.map((workout, index) => {
+                  const pointWidth = getChartWidth(intensityData.length) / intensityData.length;
+                  const leftOffset = index * pointWidth;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={workout.id}
+                      style={[styles.pointTouchArea, {
+                        left: leftOffset,
+                        width: pointWidth,
+                      }]}
+                      onPress={() => {
+                        setSelectedDataPoint({
+                          title: `Workout #${intensityData.length - index}`,
+                          details: [
+                            { label: 'Date', value: new Date(workout.created_at).toLocaleDateString() },
+                            { label: 'Intensity', value: `${workout.intensity}/10` },
+                            { label: 'Duration', value: `${workout.duration_minutes || 'N/A'} min` },
+                            { label: 'Type', value: workout.workout_type || 'General' },
+                            { label: 'Notes', value: workout.notes || 'No notes' }
+                          ]
+                        });
+                        setShowDataPointModal(true);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -750,33 +941,76 @@ export function EnhancedProgressGraphs({
               <Info size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+          
+          <Text style={[styles.graphHint, { color: colors.textSecondary }]}>
+            👆 Tap any point to see PR details
+          </Text>
+          
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={true}
             contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
           >
-            <LineChart
-              data={{
-                labels: prData.map(pr => pr.date),
-                datasets: [{ data: prData.map(pr => pr.value) }],
-              }}
-              width={getChartWidth(prData.length)}
-              height={220}
-              chartConfig={getChartConfig('pr_timeline')}
-              bezier
-              style={styles.chart}
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={true}
-              withHorizontalLines={true}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              withDots={true}
-              withShadow={false}
-              fromZero={false}
-              segments={4}
-            />
+            <View>
+              <LineChart
+                data={{
+                  labels: prData.map(pr => pr.date),
+                  datasets: [{ data: prData.map(pr => pr.value) }],
+                }}
+                width={getChartWidth(prData.length)}
+                height={220}
+                chartConfig={getChartConfig('pr_timeline')}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={true}
+                withVerticalLines={true}
+                withHorizontalLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                withDots={true}
+                withShadow={false}
+                fromZero={false}
+                segments={4}
+              />
+              
+              <View style={styles.chartTouchableOverlay}>
+                {prData.map((pr, index) => {
+                  const pointWidth = getChartWidth(prData.length) / prData.length;
+                  const leftOffset = index * pointWidth;
+                  
+                  const fullTest = strengthTests.find(t => t.id === pr.id);
+                  
+                  return (
+                    <TouchableOpacity
+                      key={pr.id}
+                      style={[styles.pointTouchArea, {
+                        left: leftOffset,
+                        width: pointWidth,
+                      }]}
+                      onPress={() => {
+                        const improvement = index > 0 
+                          ? ((pr.value - prData[index - 1].value) / prData[index - 1].value * 100).toFixed(1)
+                          : 'N/A';
+                        
+                        setSelectedDataPoint({
+                          title: `PR Test #${index + 1}`,
+                          details: [
+                            { label: 'Date', value: pr.date },
+                            { label: 'Result', value: `${pr.value} ${weightUnit}` },
+                            { label: 'Type', value: selectedPRType.replace(/_/g, ' ').toUpperCase() },
+                            { label: 'Improvement', value: improvement !== 'N/A' ? `${improvement}%` : 'First test' },
+                            { label: 'Notes', value: fullTest?.notes || 'No notes' }
+                          ]
+                        });
+                        setShowDataPointModal(true);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -840,6 +1074,10 @@ export function EnhancedProgressGraphs({
             </TouchableOpacity>
           </View>
           
+          <Text style={[styles.graphHint, { color: colors.textSecondary }]}>
+            👆 Tap any point to see measurement details
+          </Text>
+          
           {/* Measurement Type Selector */}
           <ScrollView 
             horizontal 
@@ -873,41 +1111,152 @@ export function EnhancedProgressGraphs({
             contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
           >
-            <LineChart
-              data={{
-                labels: measurementData.labels,
-                datasets: [{ data: measurementData.values.length > 0 ? measurementData.values : [0] }],
-              }}
-              width={getChartWidth(measurementData.values.length)}
-              height={220}
-              chartConfig={getChartConfig('body_measurements')}
-              bezier
-              style={styles.chart}
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={true}
-              withHorizontalLines={true}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              withDots={true}
-              withShadow={false}
-              fromZero={false}
-              segments={4}
-            />
+            <View>
+              <LineChart
+                data={{
+                  labels: measurementData.labels,
+                  datasets: [{ data: measurementData.values.length > 0 ? measurementData.values : [0] }],
+                }}
+                width={getChartWidth(measurementData.values.length)}
+                height={220}
+                chartConfig={getChartConfig('body_measurements')}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={true}
+                withVerticalLines={true}
+                withHorizontalLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                withDots={true}
+                withShadow={false}
+                fromZero={false}
+                segments={4}
+              />
+              
+              <View style={styles.chartTouchableOverlay}>
+                {measurementData.measurements.map((measurement, index) => {
+                  const pointWidth = getChartWidth(measurementData.values.length) / measurementData.values.length;
+                  const leftOffset = index * pointWidth;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={measurement.id}
+                      style={[styles.pointTouchArea, {
+                        left: leftOffset,
+                        width: pointWidth,
+                      }]}
+                      onPress={() => {
+                        const details: Array<{label: string; value: string}> = [
+                          { label: 'Date', value: new Date(measurement.measured_at || measurement.created_at).toLocaleDateString() }
+                        ];
+                        
+                        if (selectedMeasurement === 'weight' && measurement.weight) {
+                          const displayWeight = Math.round(convertWeight(
+                            measurement.weight,
+                            measurement.weight_unit || 'lbs',
+                            weightUnit
+                          ));
+                          details.push({ label: 'Weight', value: `${displayWeight} ${weightUnit}` });
+                        } else if (selectedMeasurement === 'arm' && measurement.arm_circumference) {
+                          const displayValue = convertCircumference(measurement.arm_circumference, weightUnit);
+                          details.push({ 
+                            label: 'Arm Circumference', 
+                            value: `${weightUnit === 'lbs' ? Math.round(displayValue) : displayValue.toFixed(1)} ${getCircumferenceUnit(weightUnit)}` 
+                          });
+                        } else if (selectedMeasurement === 'forearm' && measurement.forearm_circumference) {
+                          const displayValue = convertCircumference(measurement.forearm_circumference, weightUnit);
+                          details.push({ 
+                            label: 'Forearm Circumference', 
+                            value: `${weightUnit === 'lbs' ? Math.round(displayValue) : displayValue.toFixed(1)} ${getCircumferenceUnit(weightUnit)}` 
+                          });
+                        } else if (selectedMeasurement === 'wrist' && measurement.wrist_circumference) {
+                          const displayValue = convertCircumference(measurement.wrist_circumference, weightUnit);
+                          details.push({ 
+                            label: 'Wrist Circumference', 
+                            value: `${weightUnit === 'lbs' ? Math.round(displayValue) : displayValue.toFixed(1)} ${getCircumferenceUnit(weightUnit)}` 
+                          });
+                        }
+                        
+                        // Add change from previous if exists
+                        if (index > 0) {
+                          const prevMeasurement = measurementData.measurements[index - 1];
+                          let change = 0;
+                          
+                          if (selectedMeasurement === 'weight' && measurement.weight && prevMeasurement.weight) {
+                            const currentWeight = convertWeight(measurement.weight, measurement.weight_unit || 'lbs', weightUnit);
+                            const prevWeight = convertWeight(prevMeasurement.weight, prevMeasurement.weight_unit || 'lbs', weightUnit);
+                            change = currentWeight - prevWeight;
+                            details.push({ 
+                              label: 'Change', 
+                              value: `${change >= 0 ? '+' : ''}${change.toFixed(1)} ${weightUnit}` 
+                            });
+                          } else if (selectedMeasurement === 'arm' && measurement.arm_circumference && prevMeasurement.arm_circumference) {
+                            change = convertCircumference(measurement.arm_circumference, weightUnit) - convertCircumference(prevMeasurement.arm_circumference, weightUnit);
+                            const displayChange = weightUnit === 'lbs' ? Math.round(change) : change.toFixed(1);
+                            details.push({ 
+                              label: 'Change', 
+                              value: `${change >= 0 ? '+' : ''}${displayChange} ${getCircumferenceUnit(weightUnit)}` 
+                            });
+                          } else if (selectedMeasurement === 'forearm' && measurement.forearm_circumference && prevMeasurement.forearm_circumference) {
+                            change = convertCircumference(measurement.forearm_circumference, weightUnit) - convertCircumference(prevMeasurement.forearm_circumference, weightUnit);
+                            const displayChange = weightUnit === 'lbs' ? Math.round(change) : change.toFixed(1);
+                            details.push({ 
+                              label: 'Change', 
+                              value: `${change >= 0 ? '+' : ''}${displayChange} ${getCircumferenceUnit(weightUnit)}` 
+                            });
+                          } else if (selectedMeasurement === 'wrist' && measurement.wrist_circumference && prevMeasurement.wrist_circumference) {
+                            change = convertCircumference(measurement.wrist_circumference, weightUnit) - convertCircumference(prevMeasurement.wrist_circumference, weightUnit);
+                            const displayChange = weightUnit === 'lbs' ? Math.round(change) : change.toFixed(1);
+                            details.push({ 
+                              label: 'Change', 
+                              value: `${change >= 0 ? '+' : ''}${displayChange} ${getCircumferenceUnit(weightUnit)}` 
+                            });
+                          }
+                        }
+                        
+                        if (measurement.notes) {
+                          details.push({ label: 'Notes', value: measurement.notes });
+                        }
+                        
+                        setSelectedDataPoint({
+                          title: `${selectedMeasurement.charAt(0).toUpperCase() + selectedMeasurement.slice(1)} Measurement #${index + 1}`,
+                          details
+                        });
+                        setShowDataPointModal(true);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Latest</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Previous</Text>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {measurementData.values[measurementData.values.length - 1]?.toFixed(1) || 0}
-                {selectedMeasurement === 'weight' ? ` ${weightUnit}` : ' cm'}
+                {measurementData.values.length > 1
+                  ? selectedMeasurement === 'weight' 
+                    ? (measurementData.values[measurementData.values.length - 2]?.toFixed(1) || 'N/A')
+                    : weightUnit === 'lbs' 
+                      ? Math.round(measurementData.values[measurementData.values.length - 2] || 0)
+                      : (measurementData.values[measurementData.values.length - 2]?.toFixed(1) || 'N/A')
+                  : 'N/A'}
+                {measurementData.values.length > 1 
+                  ? (selectedMeasurement === 'weight' ? ` ${weightUnit}` : ` ${getCircumferenceUnit(weightUnit)}`)
+                  : ''}
               </Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Average</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Latest</Text>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {calculateAverage(measurementData.values).toFixed(1)}
-                {selectedMeasurement === 'weight' ? ` ${weightUnit}` : ' cm'}
+                {selectedMeasurement === 'weight' 
+                  ? (measurementData.values[measurementData.values.length - 1]?.toFixed(1) || 0)
+                  : weightUnit === 'lbs' 
+                    ? Math.round(measurementData.values[measurementData.values.length - 1] || 0)
+                    : (measurementData.values[measurementData.values.length - 1]?.toFixed(1) || 0)
+                }
+                {selectedMeasurement === 'weight' ? ` ${weightUnit}` : ` ${getCircumferenceUnit(weightUnit)}`}
               </Text>
             </View>
             <View style={styles.statItem}>
@@ -1075,8 +1424,6 @@ export function EnhancedProgressGraphs({
   );
 }
 
-// ... keep existing styles ...
-
 const styles = StyleSheet.create({
   container: {
     marginVertical: 8,
@@ -1122,12 +1469,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  graphHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   scrollView: {
     borderRadius: 16,
     overflow: 'hidden',
   },
   scrollContent: {
-    paddingRight: 20,
   },
   chart: {
     borderRadius: 16,
@@ -1360,5 +1712,54 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 40,
     backgroundColor: 'transparent',
+  },
+  pointTouchArea: {
+    position: 'absolute',
+    top: 0,
+    bottom: 40,
+    backgroundColor: 'transparent',
+  },
+  dataPointModal: {
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  dataPointContent: {
+    marginTop: 16,
+  },
+  dataPointRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  dataPointLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dataPointValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 16,
+  },
+  dataPointCloseButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dataPointCloseButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

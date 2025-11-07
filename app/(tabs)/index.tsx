@@ -53,7 +53,7 @@ export default function Home() {
           .select('*')
           .eq('user_id', profile.id)
           .order('created_at', { ascending: false })
-          .limit(5),
+          .limit(10), // Changed from 5 to 10
         supabase
           .from('workouts')
           .select('*')

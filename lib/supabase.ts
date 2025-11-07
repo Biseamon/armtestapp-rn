@@ -72,6 +72,8 @@ export type Profile = {
   weight_unit: 'lbs' | 'kg';  // User's preferred weight unit
   created_at: string;      // Account creation timestamp
   updated_at: string;      // Last profile update timestamp
+  avatar_url: string;
+
 };
 
 /**

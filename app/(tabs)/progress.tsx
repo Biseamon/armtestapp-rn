@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   Alert,
+  useColorScheme,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +26,7 @@ import { MeasurementsModal } from '@/components/MeasurementsModal';
 import { AddMeasurementModal } from '@/components/AddMeasurementModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatWeight, convertWeight } from '@/lib/weightUtils';
+import { getCircumferenceUnit, convertCircumference } from '@/lib/weightUtils';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { writeAsStringAsync, documentDirectory, cacheDirectory } from 'expo-file-system/legacy';
@@ -35,6 +37,7 @@ const { width } = Dimensions.get('window');
 export default function Progress() {
   const { profile, isPremium } = useAuth();
   const { colors } = useTheme();
+  const colorScheme = useColorScheme();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [strengthTests, setStrengthTests] = useState<StrengthTest[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -61,6 +64,7 @@ export default function Progress() {
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [measurements, setMeasurements] = useState<any[]>([]);
   const [showAddMeasurement, setShowAddMeasurement] = useState(false);
+  const [editingMeasurement, setEditingMeasurement] = useState<any>(null);
   const [weight, setWeight] = useState('');
   const [armCircumference, setArmCircumference] = useState('');
   const [forearmCircumference, setForearmCircumference] = useState('');
@@ -69,6 +73,7 @@ export default function Progress() {
 
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [showTestTooltip, setShowTestTooltip] = useState(false);
+  const [showGoalsTooltip, setShowGoalsTooltip] = useState(false);
 
   const [showReportModal, setShowReportModal] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -78,7 +83,7 @@ export default function Progress() {
       if (profile) {
         fetchData();
       }
-    }, [profile])
+    }, [profile, profile?.weight_unit])
   );
 
   const fetchData = async () => {
@@ -128,25 +133,50 @@ export default function Progress() {
       console.log('No profile found');
       return;
     }
+    
+    const userUnit = profile.weight_unit || 'lbs';
+    
+    // Convert circumferences back to cm for storage
+    const armCm = armCircumference 
+      ? (userUnit === 'lbs' ? parseFloat(armCircumference) * 2.54 : parseFloat(armCircumference))
+      : null;
+    
+    const forearmCm = forearmCircumference 
+      ? (userUnit === 'lbs' ? parseFloat(forearmCircumference) * 2.54 : parseFloat(forearmCircumference))
+      : null;
+    
+    const wristCm = wristCircumference 
+      ? (userUnit === 'lbs' ? parseFloat(wristCircumference) * 2.54 : parseFloat(wristCircumference))
+      : null;
   
-    const newMeasurement = {
+    const measurementData = {
       user_id: profile.id,
       weight: weight ? parseFloat(weight) : null,
-      arm_circumference: armCircumference ? parseFloat(armCircumference) : null,
-      forearm_circumference: forearmCircumference ? parseFloat(forearmCircumference) : null,
-      wrist_circumference: wristCircumference ? parseFloat(wristCircumference) : null,
+      weight_unit: userUnit,
+      arm_circumference: armCm,
+      forearm_circumference: forearmCm,
+      wrist_circumference: wristCm,
       notes: measurementNotes || null,
-      measured_at: new Date().toISOString(),
+      measured_at: editingMeasurement?.measured_at || new Date().toISOString(),
     };
   
-    console.log('Saving measurement:', newMeasurement);
+    console.log('Saving measurement:', measurementData);
   
-    const { data, error } = await supabase
-      .from('body_measurements')
-      .insert(newMeasurement)
-      .select();
-  
-    console.log('Save result:', { data, error });
+    let error;
+    if (editingMeasurement) {
+      // Update existing measurement
+      const { error: updateError } = await supabase
+        .from('body_measurements')
+        .update(measurementData)
+        .eq('id', editingMeasurement.id);
+      error = updateError;
+    } else {
+      // Insert new measurement
+      const { error: insertError } = await supabase
+        .from('body_measurements')
+        .insert(measurementData);
+      error = insertError;
+    }
   
     if (error) {
       console.error('Error saving measurement:', error);
@@ -159,9 +189,10 @@ export default function Progress() {
     setForearmCircumference('');
     setWristCircumference('');
     setMeasurementNotes('');
+    setEditingMeasurement(null);
     setShowAddMeasurement(false);
-    await fetchData(); // Make sure this is awaited
-    Alert.alert('Success', 'Measurement saved successfully!');
+    await fetchData();
+    Alert.alert('Success', `Measurement ${editingMeasurement ? 'updated' : 'saved'} successfully!`);
   };
 
   const handleAddGoal = () => {
@@ -359,6 +390,71 @@ export default function Progress() {
     }
   };
 
+  const handleEditMeasurement = (measurement: any) => {
+    setEditingMeasurement(measurement);
+    const userUnit = profile?.weight_unit || 'lbs';
+    const storedUnit = measurement.weight_unit || 'lbs';
+    
+    if (measurement.weight) {
+      const displayWeight = convertWeight(measurement.weight, storedUnit, userUnit);
+      setWeight(displayWeight.toString());
+    } else {
+      setWeight('');
+    }
+    
+    // Convert circumferences from cm (stored) to user's preferred unit (inches if lbs)
+    if (measurement.arm_circumference) {
+      const displayValue = convertCircumference(measurement.arm_circumference, userUnit);
+      setArmCircumference(userUnit === 'lbs' ? Math.round(displayValue).toString() : displayValue.toFixed(2));
+    } else {
+      setArmCircumference('');
+    }
+    
+    if (measurement.forearm_circumference) {
+      const displayValue = convertCircumference(measurement.forearm_circumference, userUnit);
+      setForearmCircumference(userUnit === 'lbs' ? Math.round(displayValue).toString() : displayValue.toFixed(2));
+    } else {
+      setForearmCircumference('');
+    }
+    
+    if (measurement.wrist_circumference) {
+      const displayValue = convertCircumference(measurement.wrist_circumference, userUnit);
+      setWristCircumference(userUnit === 'lbs' ? Math.round(displayValue).toString() : displayValue.toFixed(2));
+    } else {
+      setWristCircumference('');
+    }
+    
+    if (measurement.notes) {
+      setMeasurementNotes(measurement.notes);
+    } else {
+      setMeasurementNotes('');
+    }
+    
+    setShowMeasurements(false);
+    setShowAddMeasurement(true);
+  };
+
+  const handleDeleteMeasurement = async (measurementId: string) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this measurement?')) {
+        await supabase.from('body_measurements').delete().eq('id', measurementId);
+        fetchData();
+      }
+    } else {
+      Alert.alert('Delete Measurement', 'Are you sure you want to delete this measurement?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('body_measurements').delete().eq('id', measurementId);
+            fetchData();
+          },
+        },
+      ]);
+    }
+  };
+
   const testTypes = [
     { value: 'max_wrist_curl', label: 'Max Wrist Curl' },
     { value: 'max_grip_strength', label: 'Max Grip Strength' },
@@ -446,57 +542,164 @@ export default function Progress() {
     </Modal>
   );
 
+  const renderGoalsTooltipModal = () => (
+    <Modal
+      visible={showGoalsTooltip}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowGoalsTooltip(false)}
+    >
+      <TouchableOpacity 
+        style={styles.tooltipModalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowGoalsTooltip(false)}
+      >
+        <View style={[styles.tooltipModal, { backgroundColor: colors.surface }]}>
+          <View style={styles.tooltipHeader}>
+            <Text style={[styles.tooltipTitle, { color: colors.text }]}>
+              🎯 Goals Tracking
+            </Text>
+            <TouchableOpacity onPress={() => setShowGoalsTooltip(false)}>
+              <X size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={[styles.tooltipDescription, { color: colors.textSecondary }]}>
+            Set and track your training goals! Goals help you stay motivated and measure progress toward specific targets.
+          </Text>
+
+          <View style={[styles.tooltipTip, { backgroundColor: colors.background }]}>
+            <Text style={[styles.tooltipTipLabel, { color: colors.primary }]}>💡 How It Works:</Text>
+            <Text style={[styles.tooltipTipText, { color: colors.textSecondary }]}>
+              • Create goals with a description, target value, and deadline{'\n'}
+              • Track progress manually with the + button{'\n'}
+              • Toggle completion status by tapping the goal card{'\n'}
+              • Edit or delete goals with the action buttons{'\n'}
+              • Free users can track up to 3 goals
+            </Text>
+          </View>
+
+          <View style={[styles.tooltipExample, { backgroundColor: colors.background }]}>
+            <Text style={[styles.tooltipExampleLabel, { color: '#10B981' }]}>✅ Examples:</Text>
+            <Text style={[styles.tooltipExampleText, { color: colors.textSecondary }]}>
+              • "Complete 20 workouts" - Target: 20{'\n'}
+              • "Win 5 matches" - Target: 5{'\n'}
+              • "Train 3x per week for 8 weeks" - Target: 24{'\n'}
+              🏆 Goals turn gold when completed!
+            </Text>
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.tooltipCloseButton, { backgroundColor: colors.primary }]}
+            onPress={() => setShowGoalsTooltip(false)}
+          >
+            <Text style={styles.tooltipCloseButtonText}>Got it!</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   const generateReportData = () => {
+    // Filter data from last 3 months
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const recentWorkouts = workouts.filter(w => new Date(w.created_at) > threeMonthsAgo);
+    const recentTests = strengthTests.filter(t => new Date(t.created_at) > threeMonthsAgo);
+    const recentMeasurements = measurements.filter(m => 
+      new Date(m.measured_at || m.created_at) > threeMonthsAgo
+    );
+    
     const latestPRs = getLatestPRsByType();
-    const totalWorkouts = workouts.length;
-    const totalPRs = strengthTests.length;
     const totalGoals = goals.length;
     const completedGoals = goals.filter(g => g.is_completed).length;
     
-    // Calculate workout frequency (last 30 days)
+    // Calculate workout frequency (last 30 days within the 3-month period)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentWorkouts = workouts.filter(w => new Date(w.created_at) > thirtyDaysAgo);
+    const last30DaysWorkouts = recentWorkouts.filter(w => new Date(w.created_at) > thirtyDaysAgo);
     
-    // Calculate average intensity
-    const avgIntensity = workouts.length > 0
-      ? workouts.reduce((sum, w) => sum + (w.intensity || 0), 0) / workouts.length
+    // Calculate average intensity from recent workouts
+    const avgIntensity = recentWorkouts.length > 0
+      ? recentWorkouts.reduce((sum, w) => sum + (w.intensity || 0), 0) / recentWorkouts.length
       : 0;
     
-    // Calculate total training time
-    const totalMinutes = workouts.reduce((sum, w) => sum + (w.duration_minutes || 0), 0);
+    // Calculate total training time from recent workouts
+    const totalMinutes = recentWorkouts.reduce((sum, w) => sum + (w.duration_minutes || 0), 0);
     const totalHours = Math.floor(totalMinutes / 60);
     
-    // Get latest body measurements
-    const latestWeight = measurements
+    // Get latest measurements for each type
+    const latestWeight = recentMeasurements
       .filter(m => m.weight)
       .sort((a, b) => new Date(b.measured_at || b.created_at).getTime() - new Date(a.measured_at || a.created_at).getTime())[0];
     
-    const latestArm = measurements
+    const latestArm = recentMeasurements
       .filter(m => m.arm_circumference)
       .sort((a, b) => new Date(b.measured_at || b.created_at).getTime() - new Date(a.measured_at || a.created_at).getTime())[0];
     
-    // Active cycles
-    const activeCycles = cycles.filter(c => c.is_active);
+    const latestForearm = recentMeasurements
+      .filter(m => m.forearm_circumference)
+      .sort((a, b) => new Date(b.measured_at || b.created_at).getTime() - new Date(a.measured_at || a.created_at).getTime())[0];
+    
+    const latestWrist = recentMeasurements
+      .filter(m => m.wrist_circumference)
+      .sort((a, b) => new Date(b.measured_at || b.created_at).getTime() - new Date(a.measured_at || a.created_at).getTime())[0];
+    
+    // Get oldest measurements for comparison (from 3 months ago)
+    const oldestWeight = recentMeasurements
+      .filter(m => m.weight)
+      .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
+    
+    const oldestArm = recentMeasurements
+      .filter(m => m.arm_circumference)
+      .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
+    
+    const oldestForearm = recentMeasurements
+      .filter(m => m.forearm_circumference)
+      .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
+    
+    const oldestWrist = recentMeasurements
+      .filter(m => m.wrist_circumference)
+      .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
+    
+    // Active cycles in last 3 months
+    const activeCycles = cycles.filter(c => {
+      const cycleStart = new Date(c.start_date);
+      return cycleStart > threeMonthsAgo || c.is_active;
+    });
     
     return {
-      totalWorkouts,
-      totalPRs,
+      totalWorkouts: recentWorkouts.length,
+      totalPRs: recentTests.length,
       totalGoals,
       completedGoals,
-      recentWorkouts: recentWorkouts.length,
+      recentWorkouts: last30DaysWorkouts.length,
       avgIntensity,
       totalHours,
-      latestPRs,
+      latestPRs: latestPRs.filter(pr => recentTests.some(t => t.id === pr.id)),
       latestWeight,
       latestArm,
+      latestForearm,
+      latestWrist,
+      oldestWeight,
+      oldestArm,
+      oldestForearm,
+      oldestWrist,
       activeCycles,
       generatedAt: new Date().toLocaleDateString(),
       userUnit: profile?.weight_unit || 'lbs',
+      periodStart: threeMonthsAgo.toLocaleDateString(),
     };
   };
 
   const generateHTMLReport = (reportData: ReturnType<typeof generateReportData>) => {
+    const calculateChange = (latest: number | null, oldest: number | null) => {
+      if (!latest || !oldest) return null;
+      const change = ((latest - oldest) / oldest) * 100;
+      return change;
+    };
+    
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -536,6 +739,11 @@ export default function Progress() {
             color: #999;
             font-size: 14px;
         }
+        .period {
+            color: #FFD700;
+            font-size: 12px;
+            margin-top: 8px;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -560,6 +768,12 @@ export default function Progress() {
             color: #999;
             text-transform: uppercase;
         }
+        .change {
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        .change-positive { color: #10B981; }
+        .change-negative { color: #EF4444; }
         .section {
             margin: 30px 0;
             padding: 20px;
@@ -620,6 +834,7 @@ export default function Progress() {
         <div class="header">
             <h1>💪 My Arm Wrestling Progress</h1>
             <p class="subtitle">Report generated on ${reportData.generatedAt}</p>
+            <p class="period">📅 Last 3 Months (${reportData.periodStart} - ${reportData.generatedAt})</p>
         </div>
 
         <div class="stats-grid">
@@ -660,20 +875,77 @@ export default function Progress() {
         </div>
         ` : ''}
 
-        ${reportData.latestWeight || reportData.latestArm ? `
+        ${reportData.latestWeight || reportData.latestArm || reportData.latestForearm || reportData.latestWrist ? `
         <div class="section">
-            <h2 class="section-title">📏 Body Measurements</h2>
+            <h2 class="section-title">📏 Body Measurements Progress</h2>
             <div class="stats-grid">
                 ${reportData.latestWeight ? `
                 <div class="stat-card">
                     <div class="stat-value">${Math.round(convertWeight(reportData.latestWeight.weight!, reportData.latestWeight.weight_unit || 'lbs', reportData.userUnit))}</div>
                     <div class="stat-label">Weight (${reportData.userUnit})</div>
+                    ${(() => {
+                      const change = calculateChange(
+                        reportData.latestWeight?.weight ? convertWeight(reportData.latestWeight.weight, reportData.latestWeight.weight_unit || 'lbs', reportData.userUnit) : null,
+                        reportData.oldestWeight?.weight ? convertWeight(reportData.oldestWeight.weight, reportData.oldestWeight.weight_unit || 'lbs', reportData.userUnit) : null
+                      );
+                      return change !== null 
+                        ? `<div class="change ${change >= 0 ? 'change-positive' : 'change-negative'}">${change >= 0 ? '+' : ''}${change.toFixed(1)}% (3mo)</div>` 
+                        : '';
+                    })()}
                 </div>
                 ` : ''}
                 ${reportData.latestArm ? `
                 <div class="stat-card">
-                    <div class="stat-value">${reportData.latestArm.arm_circumference!.toFixed(1)}</div>
-                    <div class="stat-label">Arm (cm)</div>
+                    <div class="stat-value">${reportData.userUnit === 'lbs' 
+                      ? Math.round(convertCircumference(reportData.latestArm.arm_circumference!, reportData.userUnit))
+                      : reportData.latestArm.arm_circumference!.toFixed(1)
+                    }</div>
+                    <div class="stat-label">Arm (${getCircumferenceUnit(reportData.userUnit)})</div>
+                    ${(() => {
+                      const change = calculateChange(
+                        reportData.latestArm?.arm_circumference,
+                        reportData.oldestArm?.arm_circumference
+                      );
+                      return change !== null 
+                        ? `<div class="change ${change >= 0 ? 'change-positive' : 'change-negative'}">${change >= 0 ? '+' : ''}${change.toFixed(1)}% (3mo)</div>` 
+                        : '';
+                    })()}
+                </div>
+                ` : ''}
+                ${reportData.latestForearm ? `
+                <div class="stat-card">
+                    <div class="stat-value">${reportData.userUnit === 'lbs' 
+                      ? Math.round(convertCircumference(reportData.latestForearm.forearm_circumference!, reportData.userUnit))
+                      : reportData.latestForearm.forearm_circumference!.toFixed(1)
+                    }</div>
+                    <div class="stat-label">Forearm (${getCircumferenceUnit(reportData.userUnit)})</div>
+                    ${(() => {
+                      const change = calculateChange(
+                        reportData.latestForearm?.forearm_circumference,
+                        reportData.oldestForearm?.forearm_circumference
+                      );
+                      return change !== null 
+                        ? `<div class="change ${change >= 0 ? 'change-positive' : 'change-negative'}">${change >= 0 ? '+' : ''}${change.toFixed(1)}% (3mo)</div>` 
+                        : '';
+                    })()}
+                </div>
+                ` : ''}
+                ${reportData.latestWrist ? `
+                <div class="stat-card">
+                    <div class="stat-value">${reportData.userUnit === 'lbs' 
+                      ? Math.round(convertCircumference(reportData.latestWrist.wrist_circumference!, reportData.userUnit))
+                      : reportData.latestWrist.wrist_circumference!.toFixed(1)
+                    }</div>
+                    <div class="stat-label">Wrist (${getCircumferenceUnit(reportData.userUnit)})</div>
+                    ${(() => {
+                      const change = calculateChange(
+                        reportData.latestWrist?.wrist_circumference,
+                        reportData.oldestWrist?.wrist_circumference
+                      );
+                      return change !== null 
+                        ? `<div class="change ${change >= 0 ? 'change-positive' : 'change-negative'}">${change >= 0 ? '+' : ''}${change.toFixed(1)}% (3mo)</div>` 
+                        : '';
+                    })()}
                 </div>
                 ` : ''}
             </div>
@@ -788,12 +1060,19 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Confetti active={showConfetti} />
       {renderTestTooltipModal()}
+      {renderGoalsTooltipModal()}
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Progress</Text>
         <TouchableOpacity
           style={styles.reportButton}
-          onPress={() => setShowReportModal(true)} // Changed from showing ProgressReport
+          onPress={() => {
+            if (!isPremium) {
+              setShowPaywall(true);
+            } else {
+              setShowReportModal(true);
+            }
+          }}
         >
           <Activity size={20} color="#FFF" />
         </TouchableOpacity>
@@ -801,6 +1080,20 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
 
       <ScrollView style={styles.content}>
         <AdBanner />
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Analytics</Text>
+          <EnhancedProgressGraphs
+            workouts={workouts}
+            strengthTests={strengthTests}
+            measurements={measurements}
+            cycles={cycles}
+            weightUnit={profile?.weight_unit || 'lbs'}
+            isPremium={isPremium}
+            onUpgrade={() => setShowPaywall(true)}
+            key={`graphs-${isPremium ? 'premium' : 'free'}-${strengthTests.length}-${profile?.weight_unit}`}
+          />
+        </View>
 
         <View style={styles.section}>
           <TouchableOpacity
@@ -820,12 +1113,19 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                 <View style={styles.latestStats}>
                   {measurements[0].weight && (
                     <Text style={[styles.latestStat, { color: colors.text }]}>
-                      {measurements[0].weight} {profile?.weight_unit || 'lbs'}
+                      {Math.round(convertWeight(
+                        measurements[0].weight,
+                        measurements[0].weight_unit || 'lbs',
+                        profile?.weight_unit || 'lbs'
+                      ))} {profile?.weight_unit || 'lbs'}
                     </Text>
                   )}
                   {measurements[0].arm_circumference && (
                     <Text style={[styles.latestStat, { color: colors.text }]}>
-                      Arm: {measurements[0].arm_circumference}cm
+                      Arm: {profile?.weight_unit === 'lbs' 
+                        ? Math.round(convertCircumference(measurements[0].arm_circumference, profile?.weight_unit || 'lbs'))
+                        : convertCircumference(measurements[0].arm_circumference, profile?.weight_unit || 'lbs').toFixed(1)
+                      }{getCircumferenceUnit(profile?.weight_unit || 'lbs')}
                     </Text>
                   )}
                 </View>
@@ -835,21 +1135,16 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Analytics</Text>
-          <EnhancedProgressGraphs
-            workouts={workouts}
-            strengthTests={strengthTests}
-            measurements={measurements}
-            cycles={cycles}
-            weightUnit={profile?.weight_unit || 'lbs'}
-            isPremium={isPremium}
-            onUpgrade={() => setShowPaywall(true)}
-          />
-        </View>
-
-        <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Goals</Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Goals</Text>
+              <TouchableOpacity 
+                style={styles.infoButton}
+                onPress={() => setShowGoalsTooltip(true)}
+              >
+                <Info size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={styles.addButton} onPress={handleAddGoal}>
               <Plus size={20} color="#FFF" />
             </TouchableOpacity>
@@ -1068,7 +1363,7 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
             <Text style={[styles.label, { color: colors.text }]}>Deadline</Text>
             <TouchableOpacity
               style={styles.dateButton}
-              onPress={() => setShowDeadlinePicker(true)}
+              onPress={() => setShowDeadlinePicker(!showDeadlinePicker)}
             >
               <Text style={styles.dateButtonText}>
                 {deadline.toLocaleDateString('en-US', {
@@ -1084,6 +1379,9 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                 value={deadline}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
+                textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+                accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
                 onChange={(event, selectedDate) => {
                   setShowDeadlinePicker(Platform.OS === 'ios');
                   if (selectedDate) {
@@ -1343,7 +1641,7 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
               {measurements.length > 0 && (
                 <View style={styles.reportSection}>
                   <Text style={[styles.reportSectionTitle, { color: colors.text }]}>
-                    📏 Latest Measurements
+                    📏 Latest Measurements (Last 3 Months)
                   </Text>
                   <View style={styles.reportStatsRow}>
                     {measurements.filter(m => m.weight).slice(-1)[0] && (
@@ -1363,10 +1661,41 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                     {measurements.filter(m => m.arm_circumference).slice(-1)[0] && (
                       <View style={[styles.reportStatCard, { backgroundColor: colors.background }]}>
                         <Text style={[styles.reportStatValue, { color: colors.primary }]}>
-                          {measurements.filter(m => m.arm_circumference).slice(-1)[0].arm_circumference!.toFixed(1)}
+                          {profile?.weight_unit === 'lbs'
+                            ? Math.round(convertCircumference(measurements.filter(m => m.arm_circumference).slice(-1)[0].arm_circumference!, profile.weight_unit))
+                            : measurements.filter(m => m.arm_circumference).slice(-1)[0].arm_circumference!.toFixed(1)
+                          }
                         </Text>
                         <Text style={[styles.reportStatLabel, { color: colors.textSecondary }]}>
-                          Arm (cm)
+                          Arm ({getCircumferenceUnit(profile?.weight_unit || 'lbs')})
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.reportStatsRow}>
+                    {measurements.filter(m => m.forearm_circumference).slice(-1)[0] && (
+                      <View style={[styles.reportStatCard, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.reportStatValue, { color: colors.primary }]}>
+                          {profile?.weight_unit === 'lbs'
+                            ? Math.round(convertCircumference(measurements.filter(m => m.forearm_circumference).slice(-1)[0].forearm_circumference!, profile.weight_unit))
+                            : measurements.filter(m => m.forearm_circumference).slice(-1)[0].forearm_circumference!.toFixed(1)
+                          }
+                        </Text>
+                        <Text style={[styles.reportStatLabel, { color: colors.textSecondary }]}>
+                          Forearm ({getCircumferenceUnit(profile?.weight_unit || 'lbs')})
+                        </Text>
+                      </View>
+                    )}
+                    {measurements.filter(m => m.wrist_circumference).slice(-1)[0] && (
+                      <View style={[styles.reportStatCard, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.reportStatValue, { color: colors.primary }]}>
+                          {profile?.weight_unit === 'lbs'
+                            ? Math.round(convertCircumference(measurements.filter(m => m.wrist_circumference).slice(-1)[0].wrist_circumference!, profile.weight_unit))
+                            : measurements.filter(m => m.wrist_circumference).slice(-1)[0].wrist_circumference!.toFixed(1)
+                          }
+                        </Text>
+                        <Text style={[styles.reportStatLabel, { color: colors.textSecondary }]}>
+                          Wrist ({getCircumferenceUnit(profile?.weight_unit || 'lbs')})
                         </Text>
                       </View>
                     )}
@@ -1468,15 +1797,26 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
         onClose={() => setShowMeasurements(false)}
         measurements={measurements}
         onAddNew={() => {
+          setEditingMeasurement(null);
+          setWeight('');
+          setArmCircumference('');
+          setForearmCircumference('');
+          setWristCircumference('');
+          setMeasurementNotes('');
           setShowMeasurements(false);
           setShowAddMeasurement(true);
         }}
+        onEdit={handleEditMeasurement}
+        onDelete={handleDeleteMeasurement}
         weightUnit={profile?.weight_unit || 'lbs'}
       />
 
       <AddMeasurementModal
         visible={showAddMeasurement}
-        onClose={() => setShowAddMeasurement(false)}
+        onClose={() => {
+          setShowAddMeasurement(false);
+          setEditingMeasurement(null);
+        }}
         onSave={handleSaveMeasurement}
         weight={weight}
         setWeight={setWeight}
@@ -1489,6 +1829,7 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
         notes={measurementNotes}
         setNotes={setMeasurementNotes}
         weightUnit={profile?.weight_unit || 'lbs'}
+        isEditing={!!editingMeasurement}
       />
     </View>
   );
@@ -1580,7 +1921,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+       fontSize: 20,
     fontWeight: 'bold',
     color: '#FFF',
   },
@@ -1714,8 +2055,7 @@ const styles = StyleSheet.create({
   testResult: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   testNotes: {
     fontSize: 14,
@@ -1814,7 +2154,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap:  8,
     marginTop: 24,
   },
   saveButtonText: {
@@ -1928,7 +2268,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     margin: 10,
   },
-  reportHeader: {
+   reportHeader: {
     alignItems: 'center',
     marginBottom: 20,
     paddingBottom: 15,
@@ -1948,6 +2288,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 20,
+  },
+  reportStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   reportStatCard: {
     flex: 1,
@@ -1989,10 +2333,6 @@ const styles = StyleSheet.create({
   reportPRValue: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  reportStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
   },
   reportFooter: {
     marginTop: 20,

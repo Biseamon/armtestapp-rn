@@ -72,3 +72,26 @@ export const convertToLbs = (value: number, fromUnit: 'lbs' | 'kg'): number => {
 export const convertFromLbs = (weightInLbs: number, toUnit: 'lbs' | 'kg'): number => {
   return convertWeight(weightInLbs, 'lbs', toUnit);
 };
+
+/**
+ * Convert circumference from cm to inches or keep in cm
+ * @param value - Circumference value
+ * @param toUnit - User's preferred unit ('kg' or 'lbs')
+ * @returns Converted circumference value
+ */
+export function convertCircumference(value: number, toUnit: 'kg' | 'lbs'): number {
+  // Circumferences stored in cm, convert to inches if user prefers lbs
+  if (toUnit === 'lbs') {
+    return value / 2.54; // cm to inches
+  }
+  return value; // keep in cm for kg users
+}
+
+/**
+ * Get the unit for circumference based on weight unit
+ * @param weightUnit - User's weight unit preference ('kg' or 'lbs')
+ * @returns Circumference unit ('cm' or 'in')
+ */
+export function getCircumferenceUnit(weightUnit: 'kg' | 'lbs'): string {
+  return weightUnit === 'lbs' ? 'in' : 'cm';
+}
