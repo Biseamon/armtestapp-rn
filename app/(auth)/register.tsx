@@ -13,6 +13,17 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dumbbell } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import { supabase } from '@/lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const OAUTH_PROVIDERS = [
+  { name: 'Google', key: 'google', color: '#4285F4' },
+  { name: 'Facebook', key: 'facebook', color: '#1877F3' },
+  { name: 'Apple', key: 'apple', color: '#000' },
+];
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -46,6 +57,38 @@ export default function Register() {
     } else {
       router.replace('/(tabs)');
     }
+  };
+
+  const handleOAuthLogin = async (provider: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri();
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any, // or as Provider if imported
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        setError(error.message || `Failed to sign up with ${provider}`);
+        setLoading(false);
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, AuthSession.makeRedirectUri());
+
+      if (result.type === 'success' || result.type === 'dismiss') {
+        router.replace('/(tabs)');
+      } else if (result.type === 'cancel') {
+        setError(`Sign up with ${provider} was cancelled`);
+      }
+    } catch (err: any) {
+      setError(err.message || `Failed to sign up with ${provider}`);
+    }
+    setLoading(false);
   };
 
   return (
@@ -120,6 +163,21 @@ export default function Register() {
               Already have an account? <Text style={[styles.linkBold, { color: colors.primary }]}>Sign In</Text>
             </Text>
           </TouchableOpacity>
+
+          {/* Social login buttons */}
+          <View style={styles.socialLoginContainer}>
+            <Text style={[styles.socialLoginLabel, { color: colors.textSecondary }]}>Or sign up with:</Text>
+            {OAUTH_PROVIDERS.map((provider) => (
+              <TouchableOpacity
+                key={provider.key}
+                style={[styles.socialButton, { backgroundColor: provider.color }]}
+                onPress={() => handleOAuthLogin(provider.key)}
+                disabled={loading}
+              >
+                <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -192,5 +250,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     fontSize: 14,
+  },
+  socialLoginContainer: {
+    marginVertical: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  socialLoginLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  socialButton: {
+    width: '100%',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  socialButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

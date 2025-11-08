@@ -1282,15 +1282,19 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                       </TouchableOpacity>
                     )}
                   </View>
-                  <View style={styles.progressBar}>
+                  {/* Use a light bar container for progress bar */}
+                  <View style={[styles.progressBarContainer, { backgroundColor: colors.background }]}>
                     <View
                       style={[
-                        styles.progressFill,
+                        styles.progressBar,
                         goal.is_completed && styles.progressFillCompleted,
-                        { width: `${getProgressPercentage(goal)}%` },
+                        { width: `${getProgressPercentage(goal)}%`, backgroundColor: colors.secondary }
                       ]}
                     />
                   </View>
+                  <Text style={[styles.progressText, { color: colors.secondary }]}>
+                    {Math.round(getProgressPercentage(goal))}% complete
+                  </Text>
                 </View>
               </View>
             ))
@@ -2087,19 +2091,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  progressBar: {
+  // Add this style for the light bar container
+  progressBarContainer: {
     height: 8,
-    backgroundColor: '#1A1A1A',
     borderRadius: 4,
     overflow: 'hidden',
+    marginTop: 8,
   },
-  progressFill: {
+  progressBar: {
     height: '100%',
-    backgroundColor: '#E63946',
     borderRadius: 4,
   },
   progressFillCompleted: {
     backgroundColor: '#10B981',
+  },
+  progressText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
   },
   testCard: {
     backgroundColor: '#2A2A2A',

@@ -14,6 +14,18 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dumbbell } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import { supabase } from '@/lib/supabase';
+import { FontAwesome } from '@expo/vector-icons'; // For Facebook/Apple icons
+
+WebBrowser.maybeCompleteAuthSession();
+
+const OAUTH_PROVIDERS = [
+  { name: 'Google', key: 'google', color: '#4285F4', icon: <FontAwesome name="google" size={20} color="#FFF" /> },
+  { name: 'Facebook', key: 'facebook', color: '#1877F3', icon: <FontAwesome name="facebook" size={20} color="#FFF" /> },
+  { name: 'Apple', key: 'apple', color: '#000', icon: <FontAwesome name="apple" size={20} color="#FFF" /> },
+];
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -41,6 +53,40 @@ export default function Login() {
     } else {
       router.replace('/(tabs)');
     }
+  };
+
+  const handleOAuthLogin = async (provider: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri();
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any, // or as Provider if imported
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        setError(error.message || `Failed to sign in with ${provider}`);
+        setLoading(false);
+        return;
+      }
+
+      // Open the OAuth URL in a browser
+      const result = await WebBrowser.openAuthSessionAsync(data.url, AuthSession.makeRedirectUri());
+
+      if (result.type === 'success' || result.type === 'dismiss') {
+        // Supabase will handle session automatically
+        router.replace('/(tabs)');
+      } else if (result.type === 'cancel') {
+        setError(`Sign in with ${provider} was cancelled`);
+      }
+    } catch (err: any) {
+      setError(err.message || `Failed to sign in with ${provider}`);
+    }
+    setLoading(false);
   };
 
   return (
@@ -103,6 +149,22 @@ export default function Login() {
               Don't have an account? <Text style={[styles.linkBold, { color: colors.primary }]}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
+
+          {/* Social login buttons */}
+          <View style={styles.socialLoginContainer}>
+            <Text style={[styles.socialLoginLabel, { color: colors.textSecondary }]}>Or sign in with:</Text>
+            {OAUTH_PROVIDERS.map((provider) => (
+              <TouchableOpacity
+                key={provider.key}
+                style={[styles.socialButton, { backgroundColor: provider.color, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 }]}
+                onPress={() => handleOAuthLogin(provider.key)}
+                disabled={loading}
+              >
+                {provider.icon}
+                <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -175,5 +237,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     fontSize: 14,
+  },
+  socialLoginContainer: {
+    marginVertical: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  socialLoginLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  socialButton: {
+    width: '100%',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  socialButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
