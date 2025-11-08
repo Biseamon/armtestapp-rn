@@ -21,7 +21,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { EnhancedProgressGraphs } from '@/components/EnhancedProgressGraphs';
 import { ProgressReport } from '@/components/ProgressReport';
 import { Confetti } from '@/components/Confetti';
-import { Plus, Target, X, Save, Trophy, TrendingUp, Calendar, Pencil, Trash2, Activity, Info } from 'lucide-react-native';
+import { Plus, Target, X, Save, Trophy, TrendingUp, Calendar, Pencil, Trash2, Activity, Info, Minus } from 'lucide-react-native';
 import { MeasurementsModal } from '@/components/MeasurementsModal';
 import { AddMeasurementModal } from '@/components/AddMeasurementModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -38,7 +38,7 @@ const { width } = Dimensions.get('window');
 
 export default function Progress() {
   const { profile, isPremium } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
   const colorScheme = useColorScheme();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [strengthTests, setStrengthTests] = useState<StrengthTest[]>([]);
@@ -271,6 +271,21 @@ export default function Progress() {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 5000);
     }
+
+    fetchData();
+  };
+
+  const handleDecrementGoal = async (goal: Goal) => {
+    const newValue = Math.max(goal.current_value - 1, 0);
+    const isCompleted = newValue >= goal.target_value;
+
+    await supabase
+      .from('goals')
+      .update({
+        current_value: newValue,
+        is_completed: isCompleted,
+      })
+      .eq('id', goal.id);
 
     fetchData();
   };
@@ -642,7 +657,7 @@ export default function Progress() {
     
     const latestArm = recentMeasurements
       .filter(m => m.arm_circumference)
-      .sort((a, b) => new Date(b.measured_at || b.created_at).getTime() - new Date(a.measured_at || a.created_at).getTime())[0];
+      .sort((a, b) => new Date(b.measured_at || b.created_at).getTime() - new Date(a.measured_at || a.createdAt).getTime())[0];
     
     const latestForearm = recentMeasurements
       .filter(m => m.forearm_circumference)
@@ -1270,17 +1285,31 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                     <Text style={[styles.goalProgress, { color: colors.text }]}>
                       {goal.current_value} / {goal.target_value}
                     </Text>
-                    {!goal.is_completed && goal.current_value < goal.target_value && (
-                      <TouchableOpacity
-                        style={styles.incrementButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleIncrementGoal(goal);
-                        }}
-                      >
-                        <Plus size={16} color="#FFF" />
-                      </TouchableOpacity>
-                    )}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {/* Show minus button if current_value > 0 */}
+                      {!goal.is_completed && goal.current_value > 0 && (
+                        <TouchableOpacity
+                          style={styles.decrementButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleDecrementGoal(goal);
+                          }}
+                        >
+                          <Minus size={16} color="#FFF" />
+                        </TouchableOpacity>
+                      )}
+                      {!goal.is_completed && goal.current_value < goal.target_value && (
+                        <TouchableOpacity
+                          style={styles.incrementButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleIncrementGoal(goal);
+                          }}
+                        >
+                          <Plus size={16} color="#FFF" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                   {/* Use a light bar container for progress bar */}
                   <View style={[styles.progressBarContainer, { backgroundColor: colors.background }]}>
@@ -1452,9 +1481,9 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                 value={deadline}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-                textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
-                accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
+                themeVariant={theme === 'dark' ? 'light' : 'dark'}
+                accentColor={theme === 'dark' ? '#E63946' : '#2A2A2A'}
+                textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
                 onChange={(event, selectedDate) => {
                   setShowDeadlinePicker(Platform.OS === 'ios');
                   if (selectedDate) {
@@ -1839,7 +1868,7 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
                   Opens HTML in browser (use Print → Save as PDF)
                 </Text>
               </TouchableOpacity>
-            </View>
+                       </View>
           </ScrollView>
         </View>
       </Modal>
@@ -2090,6 +2119,15 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  decrementButton: {
+    backgroundColor: '#999',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
   },
   // Add this style for the light bar container
   progressBarContainer: {

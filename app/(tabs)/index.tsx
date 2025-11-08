@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
-import { Calendar, TrendingUp, Target, Clock } from 'lucide-react-native';
+import { Calendar, TrendingUp, Target, Clock, Minus } from 'lucide-react-native';
 
 export default function Home() {
   const { profile, isPremium } = useAuth();
@@ -222,6 +222,21 @@ export default function Home() {
     fetchWorkouts();
   };
 
+  const handleDecrementGoal = async (goal: any) => {
+    const newValue = Math.max(goal.current_value - 1, 0);
+    const isCompleted = newValue >= goal.target_value;
+
+    await supabase
+      .from('goals')
+      .update({
+        current_value: newValue,
+        is_completed: isCompleted,
+      })
+      .eq('id', goal.id);
+
+    fetchWorkouts();
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -341,15 +356,28 @@ export default function Home() {
                 <Text style={[styles.goalProgress, { color: colors.textSecondary }]}>
                   {goal.current_value} / {goal.target_value}
                 </Text>
-                <TouchableOpacity
-                  style={[styles.incrementButton, { backgroundColor: colors.primary }]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleIncrementGoal(goal);
-                  }}
-                >
-                  <Text style={styles.incrementText}>+</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {goal.current_value > 0 && (
+                    <TouchableOpacity
+                      style={[styles.decrementButton, { backgroundColor: '#999', marginLeft: 4 }]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDecrementGoal(goal);
+                      }}
+                    >
+                      <Minus size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.incrementButton, { backgroundColor: colors.primary }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleIncrementGoal(goal);
+                    }}
+                  >
+                    <Text style={styles.incrementText}>+</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={[styles.progressBarContainer, { backgroundColor: colors.background }]}>
                 <View
@@ -769,10 +797,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  decrementButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#999',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
   incrementText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   emptyCard: {
     backgroundColor: '#2A2A2A',

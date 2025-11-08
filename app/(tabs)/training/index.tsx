@@ -31,7 +31,7 @@ type Exercise = {
 
 export default function Training() {
   const { profile, isPremium } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
   const colorScheme = useColorScheme();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
@@ -825,14 +825,13 @@ export default function Training() {
                     value={cycleStartDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
-                    accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
+                    themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                    textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={theme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, selectedDate) => {
                       if (Platform.OS === 'android') {
                         setShowStartDatePicker(false);
                       }
-                      
                       if (event.type === 'set' && selectedDate) {
                         setCycleStartDate(selectedDate);
                       } else if (event.type === 'dismissed') {
@@ -885,14 +884,13 @@ export default function Training() {
                     value={cycleEndDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
-                    accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
+                    themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                    textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={theme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, selectedDate) => {
                       if (Platform.OS === 'android') {
                         setShowEndDatePicker(false);
                       }
-                      
                       if (event.type === 'set' && selectedDate) {
                         setCycleEndDate(selectedDate);
                       } else if (event.type === 'dismissed') {

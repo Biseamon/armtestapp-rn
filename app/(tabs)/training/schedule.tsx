@@ -34,7 +34,7 @@ interface ScheduledTraining {
 
 export default function ScheduleScreen() {
   const { profile } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
   const colorScheme = useColorScheme();
 
   const [trainings, setTrainings] = useState<ScheduledTraining[]>([]);
@@ -350,13 +350,12 @@ export default function ScheduleScreen() {
                     value={selectedDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+                    themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                    textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
                     onChange={(event, date) => {
                       if (Platform.OS === 'android') {
                         setShowDatePicker(false);
                       }
-                      
                       if (event.type === 'set' && date) {
                         setSelectedDate(date);
                       } else if (event.type === 'dismissed') {
@@ -410,14 +409,13 @@ export default function ScheduleScreen() {
                     value={selectedTime}
                     mode="time"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-                    textColor={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
-                    accentColor={colorScheme === 'dark' ? '#E63946' : '#2A7DE1'}
+                    themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                    textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={theme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, time) => {
                       if (Platform.OS === 'android') {
                         setShowTimePicker(false);
                       }
-                      
                       if (event.type === 'set' && time) {
                         setSelectedTime(time);
                       } else if (event.type === 'dismissed') {
