@@ -18,7 +18,9 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import { Crown, User, LogOut, Shield, Info, Mail, Moon, Sun, Weight, Heart, Camera, BookOpen } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
+import { BookOpen, Camera, Crown, Heart, Info, LogOut, Mail, Moon, Shield, Sun, User, Weight } from 'lucide-react-native';
 import { GuideModal } from '@/components/GuideModal';
 
 export default function Profile() {
@@ -29,38 +31,125 @@ export default function Profile() {
   const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>(profile?.weight_unit || 'lbs');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageKey, setImageKey] = useState(Date.now());
 
   useEffect(() => {
     if (profile?.avatar_url) {
+      console.log('Profile avatar URL changed:', profile.avatar_url);
       setAvatarUrl(profile.avatar_url);
+      setImageKey(Date.now());
     }
-  }, [profile]);
+  }, [profile?.avatar_url]);
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera roll permissions are required!');
-      return;
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Camera roll permissions are required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets[0] && profile) {
+        await uploadAvatar(result.assets[0]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
     }
+  };
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+  const uploadAvatar = async (asset: ImagePicker.ImagePickerAsset) => {
+    try {
+      setUploading(true);
 
-    if (!result.canceled && result.assets[0] && profile) {
-      const imageUri = result.assets[0].uri;
-      setAvatarUrl(imageUri);
+      if (!profile) {
+        Alert.alert('Error', 'No profile found');
+        return;
+      }
 
-      await supabase
+      console.log('Starting upload with asset:', asset.uri);
+
+      const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      // Use user ID as filename for security and simplicity
+      const fileName = `${profile.id}.${fileExt}`;
+      const filePath = fileName;
+
+      console.log('File details:', { fileName, fileExt, filePath });
+
+      // Read file as base64 using FileSystem legacy API
+      console.log('Reading file as base64...');
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (!base64) {
+        throw new Error('Failed to read image file');
+      }
+
+      console.log('File read successfully, converting to ArrayBuffer...');
+
+      // Upload to Supabase Storage using base64-arraybuffer
+      // This uses the authenticated session automatically
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, decode(base64), {
+          contentType: `image/${fileExt}`,
+          upsert: true, // This will replace existing file
+          cacheControl: '3600',
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('Upload successful:', uploadData);
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      console.log('Public URL:', publicUrl);
+
+      // Update profile in database
+      const { error: updateError } = await supabase
         .from('profiles')
-        .update({ profile_picture: imageUri })
+        .update({ avatar_url: publicUrl })
         .eq('id', profile.id);
 
+      if (updateError) {
+        console.error('Profile update error:', updateError);
+        throw updateError;
+      }
+
+      // Force immediate reload with cache busting
+      const newKey = Date.now();
+      setAvatarUrl(publicUrl);
+      setImageKey(newKey);
+      
       await refreshProfile();
+      
+      console.log('Avatar updated successfully');
+      Alert.alert('Success', 'Profile picture updated!');
+
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      Alert.alert(
+        'Upload Failed', 
+        error?.message || 'Failed to upload image. Please try again.'
+      );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -121,14 +210,37 @@ export default function Profile() {
           <TouchableOpacity
             style={[styles.avatarContainer, { backgroundColor: colors.background }]}
             onPress={pickImage}
+            disabled={uploading}
           >
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+              <Image 
+                source={{ 
+                  uri: `${avatarUrl}?t=${imageKey}`,
+                  cache: 'reload' // Force reload
+                }} 
+                style={styles.avatar}
+                key={`avatar-${imageKey}`}
+                onError={(e) => {
+                  console.log('Image load error:', e.nativeEvent.error);
+                  console.log('Failed URL:', `${avatarUrl}?t=${imageKey}`);
+                  // Don't clear the URL, just log the error
+                }}
+                onLoad={() => {
+                  console.log('Image loaded successfully:', avatarUrl);
+                }}
+                onLoadStart={() => {
+                  console.log('Image loading started');
+                }}
+              />
             ) : (
               <User size={60} color={colors.primary} strokeWidth={2} />
             )}
-            <View style={styles.cameraIcon}>
-              <Camera size={20} color="#FFF" />
+            <View style={[styles.cameraIcon, uploading && styles.cameraIconDisabled]}>
+              {uploading ? (
+                <Text style={styles.uploadingText}>...</Text>
+              ) : (
+                <Camera size={20} color="#FFF" />
+              )}
             </View>
           </TouchableOpacity>
           <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'User'}</Text>
@@ -455,9 +567,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
+    padding: 16,
     borderRadius: 12,
-    marginTop: 12,
+    marginTop: 16,
   },
   upgradeTextLarge: {
     color: '#1A1A1A',
@@ -472,16 +584,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
     padding: 16,
     borderRadius: 12,
     marginHorizontal: 20,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   guideButtonText: {
     color: '#FFF',
@@ -531,5 +638,13 @@ const styles = StyleSheet.create({
   },
   unitLabelActive: {
     fontWeight: 'bold',
+  },
+  uploadingText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cameraIconDisabled: {
+    opacity: 0.5,
   },
 });

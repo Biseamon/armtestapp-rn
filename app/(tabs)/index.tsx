@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   useColorScheme, // Add this import
+  Image,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -239,7 +240,18 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>💪</Text>
+            {profile?.avatar_url ? (
+              <Image 
+                source={{ uri: `${profile.avatar_url}?t=${Date.now()}` }} 
+                style={styles.avatarImage}
+                key={`home-avatar-${profile.avatar_url}`}
+                onError={(e) => {
+                  console.log('Home avatar load error:', e.nativeEvent.error);
+                }}
+              />
+            ) : (
+              <Text style={styles.logoText}>💪</Text>
+            )}
           </View>
           <View>
             <Text style={[styles.greeting, { color: colors.textTertiary }]}>Welcome back,</Text>
@@ -857,5 +869,10 @@ const styles = StyleSheet.create({
   },
   adBannerSubtext: {
     fontSize: 12,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
   },
 });
