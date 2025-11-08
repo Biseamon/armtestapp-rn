@@ -94,10 +94,7 @@ export default function Training() {
   };
 
   const handleStartWorkout = () => {
-    if (!isPremium && workoutCount >= 5) {
-      setShowPaywall(true);
-      return;
-    }
+    // Removed premium check - workouts are unlimited for everyone!
     setEditingWorkout(null);
     resetForm();
     setShowWorkoutModal(true);
@@ -460,15 +457,17 @@ export default function Training() {
           </View>
         )}
 
+        {/* AdMob Banner Placeholder - Medium Rectangle */}
         {!isPremium && (
-          <View style={styles.limitCard}>
-            <Text style={styles.limitText}>Free: {workoutCount}/5 workouts tracked</Text>
-            <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={() => setShowPaywall(true)}
-            >
-              <Text style={styles.upgradeText}>Upgrade for Unlimited</Text>
-            </TouchableOpacity>
+          <View style={[styles.adBannerContainer, { backgroundColor: colors.surface }]}>
+            <View style={styles.adBannerPlaceholder}>
+              <Text style={[styles.adBannerText, { color: colors.textSecondary }]}>
+                📱 Ad Space
+              </Text>
+              <Text style={[styles.adBannerSubtext, { color: colors.textTertiary }]}>
+                300x250
+              </Text>
+            </View>
           </View>
         )}
 
@@ -1298,5 +1297,32 @@ const styles = StyleSheet.create({
   dateButtonText: {
     fontSize: 16,
     color: '#FFF',
+  },
+  adBannerContainer: {
+    marginHorizontal: 20,
+    marginVertical: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerPlaceholder: {
+    width: 300,
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  adBannerText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  adBannerSubtext: {
+    fontSize: 12,
   },
 });

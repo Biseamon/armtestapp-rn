@@ -42,7 +42,7 @@ interface DayData {
 
 export default function CalendarScreen() {
   const { colors } = useTheme();
-  const { profile } = useAuth();
+  const { profile, isPremium } = useAuth(); // Add isPremium here
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -176,17 +176,26 @@ export default function CalendarScreen() {
     return scheduledTrainings.filter((t) => t.scheduled_date === dateStr);
   };
 
-  const isDateInCycle = (date: Date): { isInCycle: boolean; cycleName?: string } => {
+  const isDateInCycle = (date: Date): { isInCycle: boolean; cycleName?: string; cycleCount?: number; allCycles?: Cycle[] } => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
-    for (const cycle of cycles) {
-      if (dateStr >= cycle.start_date && dateStr <= cycle.end_date) {
-        return { isInCycle: true, cycleName: cycle.name };
-      }
+    
+    const activeCycles = cycles.filter(cycle => 
+      dateStr >= cycle.start_date && dateStr <= cycle.end_date
+    );
+    
+    if (activeCycles.length > 0) {
+      return { 
+        isInCycle: true, 
+        cycleName: activeCycles[0].name,
+        cycleCount: activeCycles.length,
+        allCycles: activeCycles
+      };
     }
-    return { isInCycle: false };
+    
+    return { isInCycle: false, cycleCount: 0 };
   };
 
   const getDayColor = (workoutCount: number, isInCycle: boolean, scheduledCount: number, strengthTestCount: number, isFuture: boolean): string => {
@@ -215,10 +224,10 @@ export default function CalendarScreen() {
     const workoutCount = getWorkoutCountForDate(date);
     const scheduledCount = getScheduledTrainingsForDate(date).length;
     const strengthTestCount = getStrengthTestCountForDate(date);
-    const { isInCycle } = isDateInCycle(date);
+    const cycleInfo = isDateInCycle(date);
     const goalCount = getGoalCountForDate(date);
 
-    if (workoutCount > 0 || isInCycle || goalCount > 0 || scheduledCount > 0 || strengthTestCount > 0) {
+    if (workoutCount > 0 || cycleInfo.isInCycle || goalCount > 0 || scheduledCount > 0 || strengthTestCount > 0) {
       setSelectedDate(date);
       setShowDayModal(true);
     }
@@ -296,9 +305,9 @@ export default function CalendarScreen() {
       const scheduledCount = getScheduledTrainingsForDate(date).length;
       const goalCount = getGoalCountForDate(date);
       const strengthTestCount = getStrengthTestCountForDate(date);
-      const { isInCycle, cycleName } = isDateInCycle(date);
+      const cycleInfo = isDateInCycle(date);
       const isFuture = date > today;
-      const dayColor = getDayColor(workoutCount, isInCycle, scheduledCount, strengthTestCount, isFuture);
+      const dayColor = getDayColor(workoutCount, cycleInfo.isInCycle, scheduledCount, strengthTestCount, isFuture);
   
       const isToday = date.getDate() === today.getDate() &&
                       date.getMonth() === today.getMonth() &&
@@ -313,7 +322,7 @@ export default function CalendarScreen() {
               width: daySize,
               height: daySize,
               backgroundColor: dayColor,
-              borderWidth: isInCycle && showCycles ? 2 : isToday ? 2 : 0,
+              borderWidth: cycleInfo.isInCycle && showCycles ? 2 : isToday ? 2 : 0,
               borderColor: isToday ? colors.primary : '#2A7DE1',
             },
           ]}
@@ -329,6 +338,11 @@ export default function CalendarScreen() {
           >
             {day}
           </Text>
+          {cycleInfo.isInCycle && cycleInfo.cycleCount && cycleInfo.cycleCount > 1 && showCycles && (
+            <View style={styles.multipleCyclesIndicator}>
+              <Text style={styles.multipleCyclesText}>{cycleInfo.cycleCount}</Text>
+            </View>
+          )}
           {goalCount > 0 && showGoals && (
             <View style={styles.goalIndicator}>
               <Text style={styles.goalIndicatorText}>🎯</Text>
@@ -474,9 +488,16 @@ export default function CalendarScreen() {
           </View>
           <View style={styles.legendItem}>
             <View
-              style={[styles.legendBox, { backgroundColor: '#2A7DE144' }]}
+              style={[styles.legendBox, { backgroundColor: '#2A7DE144', borderWidth: 2, borderColor: '#2A7DE1' }]}
             />
             <Text style={styles.legendText}>In cycle</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={styles.legendBox}>
+              <View style={[styles.legendBox, { backgroundColor: '#2A7DE144', borderWidth: 2, borderColor: '#2A7DE1', position: 'absolute' }]} />
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2A7DE1', zIndex: 1 }}>2</Text>
+            </View>
+            <Text style={styles.legendText}>Multiple cycles</Text>
           </View>
           <View style={styles.legendItem}>
             <View
@@ -504,6 +525,20 @@ export default function CalendarScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* AdMob Banner Placeholder - Standard Banner */}
+      {!isPremium && (
+        <View style={[styles.adBannerContainer, { backgroundColor: colors.surface }]}>
+          <View style={styles.adBannerPlaceholder}>
+            <Text style={[styles.adBannerText, { color: colors.textSecondary }]}>
+              📱 Ad Space
+            </Text>
+            <Text style={[styles.adBannerSubtext, { color: colors.textTertiary }]}>
+              320x50
+            </Text>
+          </View>
+        </View>
+      )}
 
       <View style={styles.content}>
         {renderCalendar()}
@@ -658,12 +693,22 @@ export default function CalendarScreen() {
 
                   {isDateInCycle(selectedDate).isInCycle && (
                     <>
-                      <Text style={[styles.modalSectionTitle, { color: colors.text }]}>Training Cycle</Text>
-                      <View style={[styles.cycleCard, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.cycleName, { color: colors.primary }]}>
-                          {isDateInCycle(selectedDate).cycleName}
-                        </Text>
-                      </View>
+                      <Text style={[styles.modalSectionTitle, { color: colors.text }]}>
+                        Training Cycles ({isDateInCycle(selectedDate).cycleCount || 0})
+                      </Text>
+                      {isDateInCycle(selectedDate).allCycles?.map((cycle) => (
+                        <View key={cycle.id} style={[styles.cycleCard, { backgroundColor: colors.surface }]}>
+                          <Text style={[styles.cycleName, { color: colors.primary }]}>
+                            {cycle.name}
+                          </Text>
+                          <Text style={[styles.cycleType, { color: colors.textSecondary }]}>
+                            {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
+                          </Text>
+                          <Text style={[styles.cycleDates, { color: colors.textTertiary }]}>
+                            {new Date(cycle.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(cycle.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                        </View>
+                      ))}
                     </>
                   )}
                 </>
@@ -882,6 +927,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2A7DE1',
   },
+  multipleCyclesIndicator: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    backgroundColor: '#2A7DE1',
+    borderRadius: 8,
+    minWidth: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  multipleCyclesText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
   goalIndicator: {
     position: 'absolute',
     top: 2,
@@ -1004,5 +1066,41 @@ const styles = StyleSheet.create({
   },
   strengthTestTime: {
     fontSize: 12,
+  },
+  cycleType: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  cycleDates: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  adBannerContainer: {
+    marginHorizontal: 20,
+    marginVertical: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerPlaceholder: {
+    width: 320,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  adBannerText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  adBannerSubtext: {
+    fontSize: 10,
   },
 });

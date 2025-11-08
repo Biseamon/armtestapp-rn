@@ -1136,6 +1136,20 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
           />
         </View>
 
+        {/* AdMob Banner Placeholder - Medium Rectangle */}
+        {!isPremium && (
+          <View style={[styles.adBannerContainer, { backgroundColor: colors.surface }]}>
+            <View style={styles.adBannerPlaceholder}>
+              <Text style={[styles.adBannerText, { color: colors.textSecondary }]}>
+                📱 Ad Space
+              </Text>
+              <Text style={[styles.adBannerSubtext, { color: colors.textTertiary }]}>
+                300x250
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <TouchableOpacity
             style={[styles.measurementsCard, { backgroundColor: colors.surface }]}
@@ -2426,6 +2440,26 @@ const styles = StyleSheet.create({
   },
   shareButtonSubtext: {
     color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+  adBannerContainer: {
+    marginVertical: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerPlaceholder: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  adBannerSubtext: {
     fontSize: 12,
   },
 });

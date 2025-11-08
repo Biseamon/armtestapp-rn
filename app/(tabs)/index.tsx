@@ -281,7 +281,21 @@ export default function Home() {
         </View>
       </View>
 
-      {/* Active Goals Section - Add this after stats cards */}
+      {/* AdMob Banner Placeholder - Medium Rectangle */}
+      {!isPremium && (
+        <View style={[styles.adBannerContainer, { backgroundColor: colors.surface }]}>
+          <View style={styles.adBannerPlaceholder}>
+            <Text style={[styles.adBannerText, { color: colors.textSecondary }]}>
+              📱 Ad Space
+            </Text>
+            <Text style={[styles.adBannerSubtext, { color: colors.textTertiary }]}>
+              300x250
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Active Goals Section */}
       {activeGoals.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -816,5 +830,32 @@ const styles = StyleSheet.create({
   },
   trainingDescription: {
     fontSize: 14,
+  },
+  adBannerContainer: {
+    marginHorizontal: 12,
+    marginVertical: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerPlaceholder: {
+    width: 300,
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  adBannerText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  adBannerSubtext: {
+    fontSize: 12,
   },
 });
