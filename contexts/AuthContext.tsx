@@ -19,6 +19,9 @@ type AuthContextType = {
   loading: boolean;                   // Loading state during initial auth check
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any }>;
+  signInWithApple: () => Promise<{ error: any }>;
+  signInWithFacebook: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   isPremium: boolean;                 // Whether user has premium access
   refreshProfile: () => Promise<void>; // Manually refresh profile data
@@ -153,6 +156,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
+   * Sign in with Google
+   * Uses Supabase OAuth with Google provider
+   */
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'armwrestlingpro:///(tabs)',
+      },
+    });
+    return { error };
+  };
+
+  /**
+   * Sign in with Apple
+   * Uses Supabase OAuth with Apple provider
+   */
+  const signInWithApple = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: 'armwrestlingpro:///(tabs)',
+      },
+    });
+    return { error };
+  };
+
+  /**
+   * Sign in with Facebook
+   * Uses Supabase OAuth with Facebook provider
+   */
+  const signInWithFacebook = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        redirectTo: 'armwrestlingpro:///(tabs)',
+      },
+    });
+    return { error };
+  };
+
+  /**
    * Sign out the current user
    * Clears session and profile data
    */
@@ -183,6 +228,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,          // Loading state
         signIn,           // Login function
         signUp,           // Registration function
+        signInWithGoogle, // Google OAuth login
+        signInWithApple,  // Apple OAuth login
+        signInWithFacebook, // Facebook OAuth login
         signOut,          // Logout function
         isPremium,        // Premium status
         refreshProfile,   // Refresh profile function
