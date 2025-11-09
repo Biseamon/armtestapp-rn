@@ -275,7 +275,21 @@ export default function Training() {
   };
 
   const handleSaveCycle = async () => {
-    if (!profile || !cycleName) return;
+    if (!profile) return;
+
+    // Validation
+    if (!cycleName.trim()) {
+      Alert.alert('Validation Error', 'Cycle name is required.');
+      return;
+    }
+    if (!cycleType.trim()) {
+      Alert.alert('Validation Error', 'Cycle type is required.');
+      return;
+    }
+    if (cycleStartDate >= cycleEndDate) {
+      Alert.alert('Validation Error', 'Start date must be before end date.');
+      return;
+    }
 
     const formatDate = (date: Date) => {
       const year = date.getFullYear();

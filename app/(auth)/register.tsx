@@ -41,8 +41,23 @@ export default function Register() {
       return;
     }
 
+    // Email format validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    // Password strength validation
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
+      return;
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Password must contain uppercase, lowercase, and a number');
+      return;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>_\-+=~`[\]\\\/]/.test(password)) {
+      setError('Password must contain at least one special character');
       return;
     }
 

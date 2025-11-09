@@ -71,7 +71,27 @@ export default function ScheduleScreen() {
   };
 
   const handleSave = async () => {
-    if (!profile || !title) return;
+    if (!profile) return;
+
+    // Validation
+    if (!title.trim()) {
+      Alert.alert('Validation Error', 'Training title is required.');
+      return;
+    }
+    const now = new Date();
+    const selectedDateTime = new Date(selectedDate);
+    selectedDateTime.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+    if (selectedDateTime < now) {
+      Alert.alert('Validation Error', 'Training date and time must be in the future.');
+      return;
+    }
+    if (notificationEnabled) {
+      const minutes = parseInt(minutesBefore);
+      if (isNaN(minutes) || minutes < 1 || minutes > 1440) {
+        Alert.alert('Validation Error', 'Notification minutes before must be between 1 and 1440.');
+        return;
+      }
+    }
 
     const timeString = `${selectedTime.getHours().toString().padStart(2, '0')}:${selectedTime.getMinutes().toString().padStart(2, '0')}`;
     const year = selectedDate.getFullYear();

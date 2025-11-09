@@ -54,6 +54,20 @@ export function MeasurementsModal({
     return calculateChange(current, previous);
   };
 
+  const handleEdit = (measurement: Measurement) => {
+    // Validation before allowing edit (optional, but for consistency)
+    if (
+      (measurement.weight !== null && (isNaN(Number(measurement.weight)) || Number(measurement.weight) <= 0)) ||
+      (measurement.arm_circumference !== null && (isNaN(Number(measurement.arm_circumference)) || Number(measurement.arm_circumference) <= 0)) ||
+      (measurement.forearm_circumference !== null && (isNaN(Number(measurement.forearm_circumference)) || Number(measurement.forearm_circumference) <= 0)) ||
+      (measurement.wrist_circumference !== null && (isNaN(Number(measurement.wrist_circumference)) || Number(measurement.wrist_circumference) <= 0))
+    ) {
+      alert('All measurement values must be positive numbers.');
+      return;
+    }
+    onEdit?.(measurement);
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -92,7 +106,7 @@ export function MeasurementsModal({
                   <View style={styles.actionButtons}>
                     <TouchableOpacity
                       style={styles.editButton}
-                      onPress={() => onEdit?.(measurement)}
+                      onPress={() => handleEdit(measurement)}
                     >
                       <Pencil size={16} color="#2A7DE1" />
                     </TouchableOpacity>

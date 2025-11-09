@@ -41,6 +41,36 @@ export function AddMeasurementModal({
   const { colors } = useTheme();
   const circumferenceUnit = getCircumferenceUnit(weightUnit);
 
+  const handleValidateAndSave = () => {
+    // All fields required
+    if (
+      !weight.trim() ||
+      !armCircumference.trim() ||
+      !forearmCircumference.trim() ||
+      !wristCircumference.trim()
+    ) {
+      alert('Please fill in all measurement fields.');
+      return;
+    }
+    if (isNaN(Number(weight)) || Number(weight) <= 0) {
+      alert('Weight must be a positive number.');
+      return;
+    }
+    if (isNaN(Number(armCircumference)) || Number(armCircumference) <= 0) {
+      alert('Arm circumference must be a positive number.');
+      return;
+    }
+    if (isNaN(Number(forearmCircumference)) || Number(forearmCircumference) <= 0) {
+      alert('Forearm circumference must be a positive number.');
+      return;
+    }
+    if (isNaN(Number(wristCircumference)) || Number(wristCircumference) <= 0) {
+      alert('Wrist circumference must be a positive number.');
+      return;
+    }
+    onSave();
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -121,7 +151,7 @@ export function AddMeasurementModal({
 
           <TouchableOpacity
             style={[styles.saveButton, { backgroundColor: colors.primary }]}
-            onPress={onSave}
+            onPress={handleValidateAndSave}
           >
             <Save size={20} color="#FFF" />
             <Text style={styles.saveButtonText}>

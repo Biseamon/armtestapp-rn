@@ -138,7 +138,25 @@ export default function Progress() {
       console.log('No profile found');
       return;
     }
-    
+
+    // Validation
+    if (weight && (isNaN(Number(weight)) || Number(weight) <= 0)) {
+      Alert.alert('Validation Error', 'Weight must be a positive number.');
+      return;
+    }
+    if (armCircumference && (isNaN(Number(armCircumference)) || Number(armCircumference) <= 0)) {
+      Alert.alert('Validation Error', 'Arm circumference must be a positive number.');
+      return;
+    }
+    if (forearmCircumference && (isNaN(Number(forearmCircumference)) || Number(forearmCircumference) <= 0)) {
+      Alert.alert('Validation Error', 'Forearm circumference must be a positive number.');
+      return;
+    }
+    if (wristCircumference && (isNaN(Number(wristCircumference)) || Number(wristCircumference) <= 0)) {
+      Alert.alert('Validation Error', 'Wrist circumference must be a positive number.');
+      return;
+    }
+
     const userUnit = profile.weight_unit || 'lbs';
     
     // Convert circumferences back to cm for storage
@@ -329,6 +347,12 @@ export default function Progress() {
       return;
     }
   
+    // Validation for test result
+    if (isNaN(Number(testResult)) || Number(testResult) <= 0) {
+      Alert.alert('Validation Error', 'Result must be a positive number.');
+      return;
+    }
+
     const resultValue = parseFloat(testResult);
     const userUnit = profile.weight_unit || 'lbs';
     const finalTestType = isCustomTest ? customTestName.trim().toLowerCase().replace(/\s+/g, '_') : testType;
@@ -671,33 +695,28 @@ export default function Progress() {
     const oldestWeight = recentMeasurements
       .filter(m => m.weight)
       .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
-    
+
+    // Get oldest measurements for other types
     const oldestArm = recentMeasurements
       .filter(m => m.arm_circumference)
       .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
-    
+
     const oldestForearm = recentMeasurements
       .filter(m => m.forearm_circumference)
       .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
-    
+
     const oldestWrist = recentMeasurements
       .filter(m => m.wrist_circumference)
       .sort((a, b) => new Date(a.measured_at || a.created_at).getTime() - new Date(b.measured_at || b.created_at).getTime())[0];
-    
-    // Active cycles in last 3 months
-    const activeCycles = cycles.filter(c => {
-      const cycleStart = new Date(c.start_date);
-      return cycleStart > threeMonthsAgo || c.is_active;
-    });
-    
+
+    // Get active cycles
+    const activeCycles = cycles.filter(c => c.is_active);
+
     return {
       totalWorkouts: recentWorkouts.length,
-      totalPRs: recentTests.length,
-      totalGoals,
-      completedGoals,
+      totalHours,
       recentWorkouts: last30DaysWorkouts.length,
       avgIntensity,
-      totalHours,
       latestPRs: latestPRs.filter(pr => recentTests.some(t => t.id === pr.id)),
       latestWeight,
       latestArm,
@@ -707,6 +726,8 @@ export default function Progress() {
       oldestArm,
       oldestForearm,
       oldestWrist,
+      totalGoals,
+      completedGoals,
       activeCycles,
       generatedAt: new Date().toLocaleDateString(),
       userUnit: profile?.weight_unit || 'lbs',
