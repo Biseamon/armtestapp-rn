@@ -16,13 +16,14 @@ import { Dumbbell } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
+import { FontAwesome } from '@expo/vector-icons';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const OAUTH_PROVIDERS = [
-  { name: 'Google', key: 'google', color: '#4285F4' },
-  { name: 'Facebook', key: 'facebook', color: '#1877F3' },
-  { name: 'Apple', key: 'apple', color: '#000' },
+  { name: 'Google', key: 'google', color: '#4285F4', icon: <FontAwesome name="google" size={20} color="#FFF" /> },
+  { name: 'Facebook', key: 'facebook', color: '#1877F3', icon: <FontAwesome name="facebook" size={20} color="#FFF" /> },
+  { name: 'Apple', key: 'apple', color: '#000', icon: <FontAwesome name="apple" size={20} color="#FFF" /> },
 ];
 
 export default function Register() {
@@ -81,9 +82,10 @@ export default function Register() {
       const redirectUrl = AuthSession.makeRedirectUri();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider as any, // or as Provider if imported
+        provider: provider as any,
         options: {
           redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
         },
       });
 
@@ -93,17 +95,50 @@ export default function Register() {
         return;
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, AuthSession.makeRedirectUri());
+      // Open the OAuth URL in a browser
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectUrl
+      );
 
-      if (result.type === 'success' || result.type === 'dismiss') {
-        router.replace('/(tabs)');
+      if (result.type === 'success') {
+        // Extract the URL from the result
+        const url = result.url;
+
+        // Parse the URL to get the tokens
+        const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          // Set the session with the tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            setError(sessionError.message || `Failed to set session`);
+            setLoading(false);
+            return;
+          }
+
+          // Successfully authenticated, navigate to home
+          router.replace('/(tabs)');
+        } else {
+          setError('Failed to retrieve authentication tokens');
+          setLoading(false);
+        }
       } else if (result.type === 'cancel') {
         setError(`Sign up with ${provider} was cancelled`);
+        setLoading(false);
+      } else {
+        setLoading(false);
       }
     } catch (err: any) {
       setError(err.message || `Failed to sign up with ${provider}`);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -171,36 +206,27 @@ export default function Register() {
           </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.textSecondary }]}>OR</Text>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
           </View>
 
-          <TouchableOpacity
-            style={[styles.socialButton, styles.googleButton, loading && styles.buttonDisabled]}
-            onPress={() => handleSocialSignIn('google')}
-            disabled={loading}
-          >
-            <Text style={[styles.socialButtonText, styles.googleButtonText]}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              style={[styles.socialButton, styles.appleButton, loading && styles.buttonDisabled]}
-              onPress={() => handleSocialSignIn('apple')}
-              disabled={loading}
-            >
-              <Text style={[styles.socialButtonText, styles.appleButtonText]}>Continue with Apple</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.socialButton, styles.facebookButton, loading && styles.buttonDisabled]}
-            onPress={() => handleSocialSignIn('facebook')}
-            disabled={loading}
-          >
-            <Text style={[styles.socialButtonText, styles.facebookButtonText]}>Continue with Facebook</Text>
-          </TouchableOpacity>
+          {/* Social login buttons */}
+          <View style={styles.socialLoginContainer}>
+            {OAUTH_PROVIDERS.map((provider) => (
+              <TouchableOpacity
+                key={provider.key}
+                style={[styles.socialButton, { backgroundColor: provider.color }, loading && styles.buttonDisabled]}
+                onPress={() => handleOAuthLogin(provider.key)}
+                disabled={loading}
+              >
+                <View style={styles.socialButtonContent}>
+                  {provider.icon}
+                  <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <TouchableOpacity
             onPress={() => router.push('/(auth)/login')}
@@ -210,21 +236,6 @@ export default function Register() {
               Already have an account? <Text style={[styles.linkBold, { color: colors.primary }]}>Sign In</Text>
             </Text>
           </TouchableOpacity>
-
-          {/* Social login buttons */}
-          <View style={styles.socialLoginContainer}>
-            <Text style={[styles.socialLoginLabel, { color: colors.textSecondary }]}>Or sign up with:</Text>
-            {OAUTH_PROVIDERS.map((provider) => (
-              <TouchableOpacity
-                key={provider.key}
-                style={[styles.socialButton, { backgroundColor: provider.color }]}
-                onPress={() => handleOAuthLogin(provider.key)}
-                disabled={loading}
-              >
-                <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -298,21 +309,35 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 14,
   },
-  socialLoginContainer: {
-    marginVertical: 24,
+  dividerContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginVertical: 24,
     gap: 12,
   },
-  socialLoginLabel: {
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
     fontSize: 14,
-    marginBottom: 8,
+    fontWeight: '500',
+  },
+  socialLoginContainer: {
+    width: '100%',
+    gap: 12,
   },
   socialButton: {
     width: '100%',
-    borderRadius: 8,
-    padding: 14,
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 8,
+  },
+  socialButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
   socialButtonText: {
     color: '#FFF',

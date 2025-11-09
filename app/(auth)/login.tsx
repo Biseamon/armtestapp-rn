@@ -68,9 +68,10 @@ export default function Login() {
       const redirectUrl = AuthSession.makeRedirectUri();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider as any, // or as Provider if imported
+        provider: provider as any,
         options: {
           redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
         },
       });
 
@@ -81,18 +82,49 @@ export default function Login() {
       }
 
       // Open the OAuth URL in a browser
-      const result = await WebBrowser.openAuthSessionAsync(data.url, AuthSession.makeRedirectUri());
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectUrl
+      );
 
-      if (result.type === 'success' || result.type === 'dismiss') {
-        // Supabase will handle session automatically
-        router.replace('/(tabs)');
+      if (result.type === 'success') {
+        // Extract the URL from the result
+        const url = result.url;
+
+        // Parse the URL to get the tokens
+        const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          // Set the session with the tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            setError(sessionError.message || `Failed to set session`);
+            setLoading(false);
+            return;
+          }
+
+          // Successfully authenticated, navigate to home
+          router.replace('/(tabs)');
+        } else {
+          setError('Failed to retrieve authentication tokens');
+          setLoading(false);
+        }
       } else if (result.type === 'cancel') {
         setError(`Sign in with ${provider} was cancelled`);
+        setLoading(false);
+      } else {
+        setLoading(false);
       }
     } catch (err: any) {
       setError(err.message || `Failed to sign in with ${provider}`);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -148,36 +180,27 @@ export default function Login() {
           </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.textSecondary }]}>OR</Text>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
           </View>
 
-          <TouchableOpacity
-            style={[styles.socialButton, styles.googleButton, loading && styles.buttonDisabled]}
-            onPress={() => handleSocialSignIn('google')}
-            disabled={loading}
-          >
-            <Text style={[styles.socialButtonText, styles.googleButtonText]}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              style={[styles.socialButton, styles.appleButton, loading && styles.buttonDisabled]}
-              onPress={() => handleSocialSignIn('apple')}
-              disabled={loading}
-            >
-              <Text style={[styles.socialButtonText, styles.appleButtonText]}>Continue with Apple</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.socialButton, styles.facebookButton, loading && styles.buttonDisabled]}
-            onPress={() => handleSocialSignIn('facebook')}
-            disabled={loading}
-          >
-            <Text style={[styles.socialButtonText, styles.facebookButtonText]}>Continue with Facebook</Text>
-          </TouchableOpacity>
+          {/* Social login buttons */}
+          <View style={styles.socialLoginContainer}>
+            {OAUTH_PROVIDERS.map((provider) => (
+              <TouchableOpacity
+                key={provider.key}
+                style={[styles.socialButton, { backgroundColor: provider.color }, loading && styles.buttonDisabled]}
+                onPress={() => handleOAuthLogin(provider.key)}
+                disabled={loading}
+              >
+                <View style={styles.socialButtonContent}>
+                  {provider.icon}
+                  <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <TouchableOpacity
             onPress={() => router.push('/(auth)/register')}
@@ -187,22 +210,6 @@ export default function Login() {
               Don't have an account? <Text style={[styles.linkBold, { color: colors.primary }]}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
-
-          {/* Social login buttons */}
-          <View style={styles.socialLoginContainer}>
-            <Text style={[styles.socialLoginLabel, { color: colors.textSecondary }]}>Or sign in with:</Text>
-            {OAUTH_PROVIDERS.map((provider) => (
-              <TouchableOpacity
-                key={provider.key}
-                style={[styles.socialButton, { backgroundColor: provider.color, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 }]}
-                onPress={() => handleOAuthLogin(provider.key)}
-                disabled={loading}
-              >
-                {provider.icon}
-                <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -276,6 +283,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 14,
   },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 8,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ccc',
+  },
+  dividerText: {
+    marginHorizontal: 8,
+    color: '#888',
+    fontWeight: 'bold',
+  },
   socialLoginContainer: {
     marginVertical: 24,
     alignItems: 'center',
@@ -287,10 +310,15 @@ const styles = StyleSheet.create({
   },
   socialButton: {
     width: '100%',
-    borderRadius: 8,
-    padding: 14,
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 8,
+  },
+  socialButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
   socialButtonText: {
     color: '#FFF',
