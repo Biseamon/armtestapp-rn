@@ -1,3 +1,5 @@
+// This is the home screen for Arm Wrestling Pro.
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   View,
