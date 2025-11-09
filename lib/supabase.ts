@@ -13,6 +13,7 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Load Supabase credentials from environment variables
 // Supports both Expo config (app.json) and .env file
@@ -33,18 +34,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * - autoRefreshToken: Automatically refresh expired tokens
  * - persistSession: Save session to local storage
  * - detectSessionInUrl: Disabled (not needed for mobile)
- * - storage: Uses localStorage on web, AsyncStorage on mobile
+ * - storage: Uses AsyncStorage for React Native
  * - storageKey: Custom key for storing session data
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,      // Keep user logged in
-    persistSession: true,         // Remember session across app restarts
-    detectSessionInUrl: false,    // Not needed for mobile apps
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    storageKey: 'armwrestling-auth',  // Custom storage key
-  },
-});
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+      storage: AsyncStorage,
+      storageKey: 'armwrestling-auth',
+      debug: true, // Add this to see auth debug logs
+    },
+  }
+);
 
 /**
  * Database Type Definitions
@@ -66,6 +72,8 @@ export type Profile = {
   weight_unit: 'lbs' | 'kg';  // User's preferred weight unit
   created_at: string;      // Account creation timestamp
   updated_at: string;      // Last profile update timestamp
+  avatar_url: string;
+
 };
 
 /**
@@ -81,6 +89,7 @@ export type Workout = {
   notes: string;              // Optional workout notes
   cycle_id: string | null;    // Associated training cycle (if any)
   created_at: string;         // When workout was logged
+  exercises?: { sets: number; reps: number }[]; // Add exercises property
 };
 
 /**
@@ -93,7 +102,8 @@ export type Exercise = {
   exercise_name: string;   // Name of the exercise
   sets: number;            // Number of sets performed
   reps: number;            // Reps per set
-  weight_lbs: number;      // Weight used (stored in lbs)
+  weight_lbs: number;      // Weight used (stored in user's unit)
+  weight_unit: 'kg' | 'lbs'; // Unit the weight was stored in
   notes: string;           // Optional exercise notes
 };
 
@@ -107,8 +117,9 @@ export type Goal = {
   goal_type: string;       // Description of the goal
   target_value: number;    // Target to reach
   current_value: number;   // Current progress
-  deadline: string | null; // Optional deadline date
+  deadline?: string | null; // Optional deadline date
   is_completed: boolean;   // Whether goal is achieved
+  notes?: string | null;   // Optional notes about the goal
   created_at: string;      // When goal was created
 };
 
@@ -121,7 +132,8 @@ export type StrengthTest = {
   user_id: string;         // Owner's user ID
   test_type: string;       // Type: max_wrist_curl, table_pressure, etc.
   result_value: number;    // Test result (weight or measurement)
-  notes: string;           // Optional test notes
+  result_unit: 'kg' | 'lbs'; // Unit the result was stored in
+  notes?: string;          // Optional test notes
   created_at: string;      // When test was performed
 };
 
@@ -133,10 +145,41 @@ export type Cycle = {
   id: string;              // Unique cycle ID
   user_id: string;         // Owner's user ID
   name: string;            // Cycle name (e.g., "Competition Prep 2024")
-  description: string;     // Optional cycle description
+  description?: string;     // Optional cycle description
   cycle_type: string;      // Type: strength, technique, recovery, etc.
   start_date: string;      // Cycle start date
   end_date: string;        // Cycle end date
   is_active: boolean;      // Whether this is the current active cycle
   created_at: string;      // When cycle was created
+};
+
+export type ScheduledTraining = {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  scheduled_date: string;
+  scheduled_time: string;
+  notification_enabled: boolean;
+  notification_minutes_before: number;
+  notification_id: string | null;
+  completed: boolean;
+  created_at: string;
+};
+
+/**
+ * Body Measurement
+ * User body measurements over time
+ */
+export type BodyMeasurement = {
+  id: string;
+  user_id: string;
+  weight?: number;         // Body weight
+  weight_unit: 'kg' | 'lbs'; // Unit for weight
+  arm_circumference?: number;      // in cm
+  forearm_circumference?: number;  // in cm
+  wrist_circumference?: number;    // in cm
+  notes?: string;
+  measured_at: string;
+  created_at: string;
 };

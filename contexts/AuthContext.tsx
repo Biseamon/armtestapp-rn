@@ -134,31 +134,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * @param fullName - New user's full name
    * @returns Object containing error if signup failed
    *
-   * Creates both an auth user and a profile record in the database
+   * The profile is automatically created by a database trigger
    */
   const signUp = async (email: string, password: string, fullName: string) => {
     // Create authentication user in Supabase Auth
+    // The database trigger will automatically create the profile
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-    });
-
-    // Create profile record in database if auth user was created successfully
-    if (!error && data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,        // Match profile ID with auth user ID
-          email: email,
-          full_name: fullName,
-          is_premium: false,       // New users start as free tier
-          is_test_user: false,
-        });
-
-      if (profileError) {
-        return { error: profileError };
+      options: {
+        data: {
+          full_name: fullName, // Pass full name to user metadata
+        }
       }
-    }
+    });
 
     return { error };
   };

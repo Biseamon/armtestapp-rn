@@ -6,18 +6,26 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "armwrestlingpro",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.armwrestlingpro.app"
+      "bundleIdentifier": "com.armwrestlingpro.app",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#1A1A1A"
       },
-      "package": "com.armwrestlingpro.app"
+      "package": "com.armwrestlingpro.app",
+      "statusBar": {
+        "barStyle": "auto",
+        "backgroundColor": "#00000000",
+        "translucent": true
+      }
     },
     "web": {
       "bundler": "metro",

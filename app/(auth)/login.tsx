@@ -14,6 +14,18 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dumbbell } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import { supabase } from '@/lib/supabase';
+import { FontAwesome } from '@expo/vector-icons'; // For Facebook/Apple icons
+
+WebBrowser.maybeCompleteAuthSession();
+
+const OAUTH_PROVIDERS = [
+  { name: 'Google', key: 'google', color: '#4285F4', icon: <FontAwesome name="google" size={20} color="#FFF" /> },
+  { name: 'Facebook', key: 'facebook', color: '#1877F3', icon: <FontAwesome name="facebook" size={20} color="#FFF" /> },
+  { name: 'Apple', key: 'apple', color: '#000', icon: <FontAwesome name="apple" size={20} color="#FFF" /> },
+];
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -30,6 +42,12 @@ export default function Login() {
       return;
     }
 
+    // Email format validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -43,6 +61,40 @@ export default function Login() {
     }
   };
 
+  const handleOAuthLogin = async (provider: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri();
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any, // or as Provider if imported
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        setError(error.message || `Failed to sign in with ${provider}`);
+        setLoading(false);
+        return;
+      }
+
+      // Open the OAuth URL in a browser
+      const result = await WebBrowser.openAuthSessionAsync(data.url, AuthSession.makeRedirectUri());
+
+      if (result.type === 'success' || result.type === 'dismiss') {
+        // Supabase will handle session automatically
+        router.replace('/(tabs)');
+      } else if (result.type === 'cancel') {
+        setError(`Sign in with ${provider} was cancelled`);
+      }
+    } catch (err: any) {
+      setError(err.message || `Failed to sign in with ${provider}`);
+    }
+    setLoading(false);
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -50,20 +102,20 @@ export default function Login() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Dumbbell size={60} color="#E63946" strokeWidth={2} />
-          <Text style={styles.title}>Arm Wrestling Pro</Text>
-          <Text style={styles.subtitle}>Track your strength journey</Text>
+          <Dumbbell size={60} color={colors.primary} strokeWidth={2} />
+          <Text style={[styles.title, { color: colors.text }]}>Arm Wrestling Pro</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Track your strength journey</Text>
         </View>
 
         <View style={styles.form}>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? <Text style={[styles.errorText, { backgroundColor: colors.error + '22', color: colors.error }]}>{error}</Text> : null}
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               placeholder="your@email.com"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -73,11 +125,11 @@ export default function Login() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Password</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               placeholder="Enter your password"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -86,7 +138,7 @@ export default function Login() {
           </View>
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
           >
@@ -99,10 +151,26 @@ export default function Login() {
             onPress={() => router.push('/(auth)/register')}
             disabled={loading}
           >
-            <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+            <Text style={[styles.linkText, { color: colors.textSecondary }]}>
+              Don't have an account? <Text style={[styles.linkBold, { color: colors.primary }]}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
+
+          {/* Social login buttons */}
+          <View style={styles.socialLoginContainer}>
+            <Text style={[styles.socialLoginLabel, { color: colors.textSecondary }]}>Or sign in with:</Text>
+            {OAUTH_PROVIDERS.map((provider) => (
+              <TouchableOpacity
+                key={provider.key}
+                style={[styles.socialButton, { backgroundColor: provider.color, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 }]}
+                onPress={() => handleOAuthLogin(provider.key)}
+                disabled={loading}
+              >
+                {provider.icon}
+                <Text style={styles.socialButtonText}>Continue with {provider.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -112,7 +180,6 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A1A',
   },
   scrollContent: {
     flexGrow: 1,
@@ -126,12 +193,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFF',
     marginTop: 16,
   },
   subtitle: {
     fontSize: 16,
-    color: '#999',
     marginTop: 8,
   },
   form: {
@@ -143,20 +208,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFF',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#FFF',
     borderWidth: 1,
-    borderColor: '#333',
   },
   button: {
-    backgroundColor: '#E63946',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -172,20 +232,37 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textAlign: 'center',
-    color: '#999',
     marginTop: 20,
     fontSize: 14,
   },
   linkBold: {
-    color: '#E63946',
     fontWeight: 'bold',
   },
   errorText: {
-    backgroundColor: '#4A1A1A',
-    color: '#FF6B6B',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
     fontSize: 14,
+  },
+  socialLoginContainer: {
+    marginVertical: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  socialLoginLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  socialButton: {
+    width: '100%',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  socialButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

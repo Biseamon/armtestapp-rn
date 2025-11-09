@@ -61,28 +61,50 @@ export default function CycleDetails() {
   const fetchCycleData = async () => {
     if (!profile || !cycleId) return;
 
-    const [cycleRes, workoutsRes, countRes] = await Promise.all([
-      supabase.from('cycles').select('*').eq('id', cycleId).maybeSingle(),
-      supabase
+    try {
+      // Fetch cycle details
+      const { data: cycleData, error: cycleError } = await supabase
+        .from('cycles')
+        .select('*')
+        .eq('id', cycleId)
+        .maybeSingle();
+
+      if (cycleError) {
+        console.error('Error fetching cycle:', cycleError);
+        return;
+      }
+
+      // Fetch workouts for this cycle
+      const { data: workoutsData, error: workoutsError } = await supabase
         .from('workouts')
         .select('*')
         .eq('cycle_id', cycleId)
-        .order('created_at', { ascending: false }),
-      supabase.rpc('count', {
-        table_name: 'cycle_workout_counts',
-        filter: `cycle_id.eq.${cycleId}`,
-      }),
-    ]);
+        .order('created_at', { ascending: false });
 
-    if (cycleRes.data) setCycle(cycleRes.data);
-    if (workoutsRes.data) setWorkouts(workoutsRes.data);
+      if (workoutsError) {
+        console.error('Error fetching workouts:', workoutsError);
+      }
 
-    const { count } = await supabase
-      .from('workouts')
-      .select('*', { count: 'exact', head: true })
-      .eq('cycle_id', cycleId);
+      // Get workout count
+      const { count, error: countError } = await supabase
+        .from('workouts')
+        .select('*', { count: 'exact', head: true })
+        .eq('cycle_id', cycleId);
 
-    setWorkoutCount(count || 0);
+      if (countError) {
+        console.error('Error counting workouts:', countError);
+      }
+
+      console.log('Cycle data:', cycleData);
+      console.log('Workouts data:', workoutsData);
+      console.log('Workout count:', count);
+
+      if (cycleData) setCycle(cycleData);
+      if (workoutsData) setWorkouts(workoutsData);
+      setWorkoutCount(count || 0);
+    } catch (error) {
+      console.error('Error in fetchCycleData:', error);
+    }
   };
 
   const handleStartWorkout = () => {
@@ -154,24 +176,35 @@ export default function CycleDetails() {
   };
 
   const handleSaveWorkout = async () => {
-    if (!profile || !cycleId) return;
-
+    if (!profile || !cycleId) {
+      console.log('Missing profile or cycleId');
+      return;
+    }
+  
     setSaving(true);
-
-    if (editingWorkout) {
-      const { error: updateError } = await supabase
-        .from('workouts')
-        .update({
-          workout_type: workoutType,
-          duration_minutes: parseInt(duration) || 0,
-          intensity: parseInt(intensity) || 5,
-          notes,
-        })
-        .eq('id', editingWorkout.id);
-
-      if (!updateError) {
+  
+    try {
+      if (editingWorkout) {
+        // Update existing workout
+        const { error: updateError } = await supabase
+          .from('workouts')
+          .update({
+            workout_type: workoutType,
+            duration_minutes: parseInt(duration) || 0,
+            intensity: parseInt(intensity) || 5,
+            notes,
+          })
+          .eq('id', editingWorkout.id);
+  
+        if (updateError) {
+          console.error('Error updating workout:', updateError);
+          throw updateError;
+        }
+  
+        // Delete old exercises
         await supabase.from('exercises').delete().eq('workout_id', editingWorkout.id);
-
+  
+        // Insert new exercises if any
         if (exercises.length > 0) {
           const exercisesData = exercises.map((ex) => ({
             workout_id: editingWorkout.id,
@@ -179,43 +212,74 @@ export default function CycleDetails() {
             sets: ex.sets,
             reps: ex.reps,
             weight_lbs: ex.weight_lbs,
-            notes: ex.notes,
+            notes: ex.notes || '',
           }));
-          await supabase.from('exercises').insert(exercisesData);
+          
+          const { error: exercisesError } = await supabase
+            .from('exercises')
+            .insert(exercisesData);
+            
+          if (exercisesError) {
+            console.error('Error inserting exercises:', exercisesError);
+          }
+        }
+      } else {
+        // Create new workout
+        console.log('Creating workout with cycle_id:', cycleId);
+        
+        const { data: workout, error: workoutError } = await supabase
+          .from('workouts')
+          .insert({
+            user_id: profile.id,
+            workout_type: workoutType,
+            duration_minutes: parseInt(duration) || 0,
+            intensity: parseInt(intensity) || 5,
+            notes,
+            cycle_id: cycleId as string,
+          })
+          .select()
+          .single();
+  
+        console.log('Workout created:', workout);
+        console.log('Workout error:', workoutError);
+  
+        if (workoutError) {
+          console.error('Error creating workout:', workoutError);
+          throw workoutError;
+        }
+  
+        // Insert exercises if workout was created successfully
+        if (workout && exercises.length > 0) {
+          const exercisesData = exercises.map((ex) => ({
+            workout_id: workout.id,
+            exercise_name: ex.exercise_name,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight_lbs: ex.weight_lbs,
+            notes: ex.notes || '',
+          }));
+          
+          const { error: exercisesError } = await supabase
+            .from('exercises')
+            .insert(exercisesData);
+            
+          if (exercisesError) {
+            console.error('Error inserting exercises:', exercisesError);
+          }
         }
       }
-    } else {
-      const { data: workout, error: workoutError } = await supabase
-        .from('workouts')
-        .insert({
-          user_id: profile.id,
-          workout_type: workoutType,
-          duration_minutes: parseInt(duration) || 0,
-          intensity: parseInt(intensity) || 5,
-          notes,
-          cycle_id: cycleId as string,
-        })
-        .select()
-        .single();
-
-      if (!workoutError && workout && exercises.length > 0) {
-        const exercisesData = exercises.map((ex) => ({
-          workout_id: workout.id,
-          exercise_name: ex.exercise_name,
-          sets: ex.sets,
-          reps: ex.reps,
-          weight_lbs: ex.weight_lbs,
-          notes: ex.notes,
-        }));
-        await supabase.from('exercises').insert(exercisesData);
-      }
+  
+      setSaving(false);
+      setShowWorkoutModal(false);
+      resetForm();
+      await fetchCycleData(); // Refresh the data
+    } catch (error) {
+      console.error('Error saving workout:', error);
+      Alert.alert('Error', 'Failed to save workout');
+      setSaving(false);
     }
-
-    setSaving(false);
-    setShowWorkoutModal(false);
-    resetForm();
-    fetchCycleData();
   };
+  
 
   const resetForm = () => {
     setWorkoutType('table_practice');

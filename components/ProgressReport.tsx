@@ -60,9 +60,26 @@ export function ProgressReport({
     return (total / workouts.length).toFixed(0);
   };
 
+  const getLatestPRsByType = () => {
+    const prsByType: { [key: string]: any } = {};
+    
+    // Group by test_type and keep only the latest
+    strengthTests.forEach(test => {
+      if (!prsByType[test.test_type] || 
+          new Date(test.created_at) > new Date(prsByType[test.test_type].created_at)) {
+        prsByType[test.test_type] = test;
+      }
+    });
+    
+    // Return only the 4 most recent PRs
+    return Object.values(prsByType)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 4);
+  };
+
   const strengthTrend = calculateStrengthTrend();
-  const consistency = calculateWorkoutConsistency();
-  const goalCompletion = calculateGoalCompletion();
+  const consistency = Number(calculateWorkoutConsistency());
+  const goalCompletion = Number(calculateGoalCompletion());
   const avgDuration = getAverageWorkoutDuration();
 
   const getTrendIcon = () => {
@@ -142,7 +159,7 @@ export function ProgressReport({
                     style={[
                       styles.progressFill,
                       {
-                        width: `${consistency}%`,
+                        width: `${Number(consistency)}%`,
                         backgroundColor: Number(consistency) >= 70 ? '#10B981' : Number(consistency) >= 50 ? '#FFD700' : '#E63946'
                       }
                     ]}

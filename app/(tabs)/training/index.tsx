@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   Platform,
+  useColorScheme,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +19,7 @@ import { AdBanner } from '@/components/AdBanner';
 import { PaywallModal } from '@/components/PaywallModal';
 import { Plus, X, Save, Pencil, Trash2, Calendar as CalendarIcon, Clock } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { formatWeight, convertToLbs, convertFromLbs } from '@/lib/weightUtils';
+import { convertFromLbs, convertToLbs, convertWeight } from '@/lib/weightUtils';
 
 type Exercise = {
   exercise_name: string;
@@ -30,7 +31,8 @@ type Exercise = {
 
 export default function Training() {
   const { profile, isPremium } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
+  const colorScheme = useColorScheme();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
@@ -66,7 +68,7 @@ export default function Training() {
 
   const fetchData = async () => {
     if (!profile) return;
-
+  
     const [workoutsRes, cyclesRes, countRes] = await Promise.all([
       supabase
         .from('workouts')
@@ -83,17 +85,16 @@ export default function Training() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', profile.id),
     ]);
-
+  
+    console.log('Cycles response:', { data: cyclesRes.data, error: cyclesRes.error });
+    
     if (workoutsRes.data) setWorkouts(workoutsRes.data);
     if (cyclesRes.data) setCycles(cyclesRes.data);
     setWorkoutCount(countRes.count || 0);
   };
 
   const handleStartWorkout = () => {
-    if (!isPremium && workoutCount >= 5) {
-      setShowPaywall(true);
-      return;
-    }
+    // Removed premium check - workouts are unlimited for everyone!
     setEditingWorkout(null);
     resetForm();
     setShowWorkoutModal(true);
@@ -102,20 +103,39 @@ export default function Training() {
   const handleEditWorkout = async (workout: Workout) => {
     setEditingWorkout(workout);
     setWorkoutType(workout.workout_type);
-    setDuration(String(workout.duration_minutes));
-    setIntensity(String(workout.intensity));
-    setNotes(workout.notes);
+    setDuration(workout.duration_minutes?.toString() || '');
+    setIntensity(workout.intensity?.toString() || '');
+    setNotes(workout.notes || '');
     setSelectedCycleId(workout.cycle_id);
-
-    const { data: exercisesData } = await supabase
+    
+    // Load exercises for this workout
+    const { data: exercisesData, error } = await supabase
       .from('exercises')
       .select('*')
       .eq('workout_id', workout.id);
-
-    if (exercisesData) {
-      setExercises(exercisesData);
+    
+    if (error) {
+      console.error('Error loading exercises:', error);
+    } else if (exercisesData) {
+      const userUnit = profile?.weight_unit || 'lbs';
+      
+      // Convert exercise weights to user's current unit preference
+      const convertedExercises = exercisesData.map(exercise => {
+        const storedUnit = exercise.weight_unit || 'lbs';
+        const convertedWeight = convertWeight(exercise.weight_lbs, storedUnit, userUnit);
+        
+        return {
+          exercise_name: exercise.exercise_name,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          weight_lbs: convertedWeight,
+          notes: exercise.notes || '',
+        };
+      });
+      
+      setExercises(convertedExercises);
     }
-
+    
     setShowWorkoutModal(true);
   };
 
@@ -155,60 +175,87 @@ export default function Training() {
   };
 
   const handleSaveWorkout = async () => {
-    if (!profile) return;
-
-    setSaving(true);
-
-    if (editingWorkout) {
-      const { error: updateError } = await supabase
-        .from('workouts')
-        .update({
-          workout_type: workoutType,
-          duration_minutes: parseInt(duration) || 0,
-          intensity: parseInt(intensity) || 5,
-          notes,
-          cycle_id: selectedCycleId,
-        })
-        .eq('id', editingWorkout.id);
-
-      if (!updateError) {
-        await supabase.from('exercises').delete().eq('workout_id', editingWorkout.id);
-
-        if (exercises.length > 0) {
-          const exercisesData = exercises.map((ex) => ({
-            workout_id: editingWorkout.id,
-            ...ex,
-          }));
-          await supabase.from('exercises').insert(exercisesData);
-        }
-      }
-    } else {
-      const { data: workout, error: workoutError } = await supabase
-        .from('workouts')
-        .insert({
-          user_id: profile.id,
-          workout_type: workoutType,
-          duration_minutes: parseInt(duration) || 0,
-          intensity: parseInt(intensity) || 5,
-          notes,
-          cycle_id: selectedCycleId,
-        })
-        .select()
-        .single();
-
-      if (!workoutError && workout && exercises.length > 0) {
-        const exercisesData = exercises.map((ex) => ({
-          workout_id: workout.id,
-          ...ex,
-        }));
-        await supabase.from('exercises').insert(exercisesData);
-      }
+    if (!profile) {
+      console.log('No profile found');
+      return;
     }
-
-    setSaving(false);
-    setShowWorkoutModal(false);
-    resetForm();
-    fetchData();
+    
+    setSaving(true);
+    console.log('Starting save workout...');
+  
+    try {
+      let workoutId: string;
+      const userUnit = profile.weight_unit || 'lbs';
+  
+      if (editingWorkout) {
+        // Update existing workout
+        const { error: workoutError } = await supabase
+          .from('workouts')
+          .update({
+            workout_type: workoutType,
+            duration_minutes: parseInt(duration) || 0,
+            intensity: parseInt(intensity) || 5,
+            notes,
+            cycle_id: selectedCycleId,
+          })
+          .eq('id', editingWorkout.id);
+        
+        if (workoutError) throw workoutError;
+        workoutId = editingWorkout.id;
+  
+        // Delete existing exercises for this workout
+        await supabase
+          .from('exercises')
+          .delete()
+          .eq('workout_id', workoutId);
+        
+      } else {
+        // Create new workout
+        const { data: workoutData, error: workoutError } = await supabase
+          .from('workouts')
+          .insert({
+            user_id: profile.id,
+            workout_type: workoutType,
+            duration_minutes: parseInt(duration) || 0,
+            intensity: parseInt(intensity) || 5,
+            notes,
+            cycle_id: selectedCycleId,
+          })
+          .select()
+          .single();
+        
+        if (workoutError) throw workoutError;
+        workoutId = workoutData.id;
+      }
+  
+      // Insert exercises if any exist - WITH UNIT TRACKING
+      if (exercises.length > 0) {
+        const exercisesToInsert = exercises.map(exercise => ({
+          workout_id: workoutId,
+          exercise_name: exercise.exercise_name,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          weight_lbs: exercise.weight_lbs,
+          weight_unit: userUnit,
+          notes: exercise.notes || '',
+        }));
+  
+        const { error: exercisesError } = await supabase
+          .from('exercises')
+          .insert(exercisesToInsert);
+        
+        if (exercisesError) throw exercisesError;
+      }
+      
+      setShowWorkoutModal(false);
+      resetForm();
+      await fetchData();
+    } catch (error) {
+      console.error('Error saving workout:', error);
+      Alert.alert('Error', 'Failed to save workout');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddCycle = () => {
@@ -228,7 +275,21 @@ export default function Training() {
   };
 
   const handleSaveCycle = async () => {
-    if (!profile || !cycleName) return;
+    if (!profile) return;
+
+    // Validation
+    if (!cycleName.trim()) {
+      Alert.alert('Validation Error', 'Cycle name is required.');
+      return;
+    }
+    if (!cycleType.trim()) {
+      Alert.alert('Validation Error', 'Cycle type is required.');
+      return;
+    }
+    if (cycleStartDate >= cycleEndDate) {
+      Alert.alert('Validation Error', 'Start date must be before end date.');
+      return;
+    }
 
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
@@ -410,15 +471,17 @@ export default function Training() {
           </View>
         )}
 
+        {/* AdMob Banner Placeholder - Medium Rectangle */}
         {!isPremium && (
-          <View style={styles.limitCard}>
-            <Text style={styles.limitText}>Free: {workoutCount}/5 workouts tracked</Text>
-            <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={() => setShowPaywall(true)}
-            >
-              <Text style={styles.upgradeText}>Upgrade for Unlimited</Text>
-            </TouchableOpacity>
+          <View style={[styles.adBannerContainer, { backgroundColor: colors.surface }]}>
+            <View style={[styles.adBannerPlaceholder, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={[styles.adBannerText, { color: colors.textSecondary }]}>
+                📱 Ad Space
+              </Text>
+              <Text style={[styles.adBannerSubtext, { color: colors.textTertiary }]}>
+                300x250
+              </Text>
+            </View>
           </View>
         )}
 
@@ -481,13 +544,13 @@ export default function Training() {
         animationType="slide"
         onRequestClose={() => setShowWorkoutModal(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.modalBackground }]}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingWorkout ? 'Edit Workout' : 'Log Workout'}
             </Text>
             <TouchableOpacity onPress={() => setShowWorkoutModal(false)}>
-              <X size={24} color="#999" />
+              <X size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -499,14 +562,16 @@ export default function Training() {
                   <TouchableOpacity
                     style={[
                       styles.typeButton,
-                      selectedCycleId === null && styles.typeButtonActive,
+                      { backgroundColor: colors.surface, borderColor: colors.border },
+                      selectedCycleId === null && [styles.typeButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                     ]}
                     onPress={() => setSelectedCycleId(null)}
                   >
                     <Text
                       style={[
                         styles.typeButtonText,
-                        selectedCycleId === null && styles.typeButtonTextActive,
+                        { color: colors.textSecondary },
+                        selectedCycleId === null && [styles.typeButtonTextActive, { color: '#FFF' }],
                       ]}
                     >
                       None
@@ -517,14 +582,16 @@ export default function Training() {
                       key={cycle.id}
                       style={[
                         styles.typeButton,
-                        selectedCycleId === cycle.id && styles.typeButtonActive,
+                        { backgroundColor: colors.surface, borderColor: colors.border },
+                        selectedCycleId === cycle.id && [styles.typeButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                       ]}
                       onPress={() => setSelectedCycleId(cycle.id)}
                     >
                       <Text
                         style={[
                           styles.typeButtonText,
-                          selectedCycleId === cycle.id && styles.typeButtonTextActive,
+                          { color: colors.textSecondary },
+                          selectedCycleId === cycle.id && [styles.typeButtonTextActive, { color: '#FFF' }],
                         ]}
                       >
                         {cycle.name}
@@ -542,14 +609,16 @@ export default function Training() {
                   key={type.value}
                   style={[
                     styles.typeButton,
-                    workoutType === type.value && styles.typeButtonActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    workoutType === type.value && [styles.typeButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setWorkoutType(type.value)}
                 >
                   <Text
                     style={[
                       styles.typeButtonText,
-                      workoutType === type.value && styles.typeButtonTextActive,
+                      { color: colors.textSecondary },
+                      workoutType === type.value && [styles.typeButtonTextActive, { color: '#FFF' }],
                     ]}
                   >
                     {type.label}
@@ -606,7 +675,7 @@ export default function Training() {
                   <View style={styles.exerciseCardHeader}>
                     <Text style={[styles.exerciseCardTitle, { color: colors.text }]}>Exercise {index + 1}</Text>
                     <TouchableOpacity onPress={() => handleRemoveExercise(index)}>
-                      <X size={20} color="#999" />
+                      <X size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
 
@@ -644,22 +713,22 @@ export default function Training() {
                         keyboardType="number-pad"
                       />
                     </View>
-
                     <View style={styles.exerciseInputGroup}>
-                      <Text style={[styles.smallLabel, { color: colors.text }]}>Weight ({profile?.weight_unit || 'lbs'})</Text>
+                      <Text style={[styles.smallLabel, { color: colors.text }]}>
+                        Weight ({profile?.weight_unit || 'lbs'})
+                      </Text>
                       <TextInput
                         style={[styles.smallInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                        value={String(Math.round(convertFromLbs(exercise.weight_lbs, profile?.weight_unit || 'lbs')))}
+                        value={String(Math.round(exercise.weight_lbs))}
                         onChangeText={(val) => {
                           const inputValue = parseInt(val) || 0;
-                          const lbsValue = convertToLbs(inputValue, profile?.weight_unit || 'lbs');
-                          handleUpdateExercise(index, 'weight_lbs', lbsValue);
+                          handleUpdateExercise(index, 'weight_lbs', inputValue);
                         }}
                         keyboardType="number-pad"
                       />
                     </View>
+                    </View>
                   </View>
-                </View>
               ))}
             </View>
 
@@ -684,13 +753,13 @@ export default function Training() {
         animationType="slide"
         onRequestClose={() => setShowCycleModal(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.modalBackground }]}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingCycle ? 'Edit Training Cycle' : 'New Training Cycle'}
             </Text>
             <TouchableOpacity onPress={() => setShowCycleModal(false)}>
-              <X size={24} color="#999" />
+              <X size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -711,14 +780,16 @@ export default function Training() {
                   key={type.value}
                   style={[
                     styles.typeButton,
-                    cycleType === type.value && styles.typeButtonActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    cycleType === type.value && [styles.typeButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setCycleType(type.value)}
                 >
                   <Text
                     style={[
                       styles.typeButtonText,
-                      cycleType === type.value && styles.typeButtonTextActive,
+                      { color: colors.textSecondary },
+                      cycleType === type.value && [styles.typeButtonTextActive, { color: '#FFF' }],
                     ]}
                   >
                     {type.label}
@@ -751,27 +822,34 @@ export default function Training() {
             ) : (
               <>
                 <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowStartDatePicker(true)}
+                  style={[styles.dateButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => setShowStartDatePicker(!showStartDatePicker)}
                 >
-                  <Text style={styles.dateButtonText}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
                     {cycleStartDate.toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                     })}
                   </Text>
-                  <CalendarIcon size={20} color="#999" />
+                  <CalendarIcon size={20} color={showStartDatePicker ? '#E63946' : colors.textSecondary} />
                 </TouchableOpacity>
                 {showStartDatePicker && (
                   <DateTimePicker
                     value={cycleStartDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                    textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={theme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, selectedDate) => {
-                      setShowStartDatePicker(Platform.OS === 'ios');
-                      if (selectedDate) {
+                      if (Platform.OS === 'android') {
+                        setShowStartDatePicker(false);
+                      }
+                      if (event.type === 'set' && selectedDate) {
                         setCycleStartDate(selectedDate);
+                      } else if (event.type === 'dismissed') {
+                        setShowStartDatePicker(false);
                       }
                     }}
                   />
@@ -803,27 +881,34 @@ export default function Training() {
             ) : (
               <>
                 <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowEndDatePicker(true)}
+                  style={[styles.dateButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => setShowEndDatePicker(!showEndDatePicker)}
                 >
-                  <Text style={styles.dateButtonText}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
                     {cycleEndDate.toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                     })}
                   </Text>
-                  <CalendarIcon size={20} color="#999" />
+                  <CalendarIcon size={20} color={showEndDatePicker ? '#E63946' : colors.textSecondary} />
                 </TouchableOpacity>
                 {showEndDatePicker && (
                   <DateTimePicker
                     value={cycleEndDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    themeVariant={theme === 'dark' ? 'dark' : 'light'}
+                    textColor={theme === 'dark' ? '#FFFFFF' : '#000000'}
+                    accentColor={theme === 'dark' ? '#E63946' : '#2A7DE1'}
                     onChange={(event, selectedDate) => {
-                      setShowEndDatePicker(Platform.OS === 'ios');
-                      if (selectedDate) {
+                      if (Platform.OS === 'android') {
+                        setShowEndDatePicker(false);
+                      }
+                      if (event.type === 'set' && selectedDate) {
                         setCycleEndDate(selectedDate);
+                      } else if (event.type === 'dismissed') {
+                        setShowEndDatePicker(false);
                       }
                     }}
                   />
@@ -1083,7 +1168,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
   },
   modalTitle: {
     fontSize: 24,
@@ -1120,23 +1204,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typeButton: {
-    backgroundColor: '#2A2A2A',
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#333',
   },
   typeButtonActive: {
-    backgroundColor: '#E63946',
-    borderColor: '#E63946',
+    // Styles applied inline now for dynamic colors
   },
   typeButtonText: {
     fontSize: 14,
-    color: '#999',
   },
   typeButtonTextActive: {
-    color: '#FFF',
     fontWeight: 'bold',
   },
   exercisesSection: {
@@ -1159,10 +1238,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   exerciseCard: {
-    backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
   },
   exerciseCardHeader: {
     flexDirection: 'row',
@@ -1220,17 +1299,39 @@ const styles = StyleSheet.create({
     height: 40,
   },
   dateButton: {
-    backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333',
   },
   dateButtonText: {
     fontSize: 16,
-    color: '#FFF',
+  },
+  adBannerContainer: {
+    marginHorizontal: 20,
+    marginVertical: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerPlaceholder: {
+    width: 300,
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+  },
+  adBannerText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  adBannerSubtext: {
+    fontSize: 12,
   },
 });

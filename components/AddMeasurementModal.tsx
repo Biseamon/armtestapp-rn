@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { X, Save } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { getCircumferenceUnit } from '@/lib/weightUtils';
 
-type Props = {
+interface AddMeasurementModalProps {
   visible: boolean;
   onClose: () => void;
   onSave: () => void;
@@ -16,8 +17,9 @@ type Props = {
   setWristCircumference: (value: string) => void;
   notes: string;
   setNotes: (value: string) => void;
-  weightUnit: string;
-};
+  weightUnit: 'kg' | 'lbs';
+  isEditing?: boolean;
+}
 
 export function AddMeasurementModal({
   visible,
@@ -34,21 +36,57 @@ export function AddMeasurementModal({
   notes,
   setNotes,
   weightUnit,
-}: Props) {
+  isEditing = false,
+}: AddMeasurementModalProps) {
   const { colors } = useTheme();
+  const circumferenceUnit = getCircumferenceUnit(weightUnit);
+
+  const handleValidateAndSave = () => {
+    // All fields required
+    if (
+      !weight.trim() ||
+      !armCircumference.trim() ||
+      !forearmCircumference.trim() ||
+      !wristCircumference.trim()
+    ) {
+      alert('Please fill in all measurement fields.');
+      return;
+    }
+    if (isNaN(Number(weight)) || Number(weight) <= 0) {
+      alert('Weight must be a positive number.');
+      return;
+    }
+    if (isNaN(Number(armCircumference)) || Number(armCircumference) <= 0) {
+      alert('Arm circumference must be a positive number.');
+      return;
+    }
+    if (isNaN(Number(forearmCircumference)) || Number(forearmCircumference) <= 0) {
+      alert('Forearm circumference must be a positive number.');
+      return;
+    }
+    if (isNaN(Number(wristCircumference)) || Number(wristCircumference) <= 0) {
+      alert('Wrist circumference must be a positive number.');
+      return;
+    }
+    onSave();
+  };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Add Measurement</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {isEditing ? 'Edit Measurement' : 'Add Measurement'}
+          </Text>
           <TouchableOpacity onPress={onClose}>
-            <X size={24} color="#999" />
+            <X size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content}>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>All fields are optional. Enter measurements to track your progress.</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            All fields are optional. {weightUnit === 'lbs' ? 'Circumferences will be stored in cm (enter in inches, we\'ll convert).' : 'Enter measurements to track your progress.'}
+          </Text>
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>Weight ({weightUnit})</Text>
@@ -63,36 +101,36 @@ export function AddMeasurementModal({
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Arm Circumference (cm)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Arm Circumference ({circumferenceUnit})</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={armCircumference}
               onChangeText={setArmCircumference}
-              placeholder="e.g., 35"
+              placeholder={circumferenceUnit === 'in' ? 'e.g., 14' : 'e.g., 35'}
               placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Forearm Circumference (cm)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Forearm Circumference ({circumferenceUnit})</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={forearmCircumference}
               onChangeText={setForearmCircumference}
-              placeholder="e.g., 28"
+              placeholder={circumferenceUnit === 'in' ? 'e.g., 11' : 'e.g., 28'}
               placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Wrist Circumference (cm)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Wrist Circumference ({circumferenceUnit})</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={wristCircumference}
               onChangeText={setWristCircumference}
-              placeholder="e.g., 17"
+              placeholder={circumferenceUnit === 'in' ? 'e.g., 7' : 'e.g., 17'}
               placeholderTextColor={colors.textTertiary}
               keyboardType="decimal-pad"
             />
@@ -111,9 +149,14 @@ export function AddMeasurementModal({
             />
           </View>
 
-          <TouchableOpacity style={styles.saveButton} onPress={onSave}>
+          <TouchableOpacity
+            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+            onPress={handleValidateAndSave}
+          >
             <Save size={20} color="#FFF" />
-            <Text style={styles.saveButtonText}>Save Measurement</Text>
+            <Text style={styles.saveButtonText}>
+              {isEditing ? 'Update Measurement' : 'Save Measurement'}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </View>

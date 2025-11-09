@@ -1,3 +1,5 @@
+// This is the home screen for Arm Wrestling Pro.
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -6,20 +8,24 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
+  useColorScheme, // Add this import
+  Image,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
-import { Calendar, TrendingUp, Target, Clock } from 'lucide-react-native';
+import { Calendar, TrendingUp, Target, Clock, Minus } from 'lucide-react-native';
 
 export default function Home() {
   const { profile, isPremium } = useAuth();
   const { colors } = useTheme();
+  const colorScheme = useColorScheme(); // Add this line
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [completedGoals, setCompletedGoals] = useState<any[]>([]);
+  const [activeGoals, setActiveGoals] = useState<any[]>([]); // Add this line
   const [scheduledTrainings, setScheduledTrainings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -28,19 +34,29 @@ export default function Home() {
     thisWeek: 0,
     totalMinutes: 0,
     avgIntensity: 0,
+    viewAll: {
+      fontSize: 14,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+    },
   });
+
+  // Add this useEffect to log theme changes (optional, for debugging)
+  useEffect(() => {
+    console.log('Current theme:', colorScheme);
+  }, [colorScheme]);
 
   const fetchWorkouts = async () => {
     if (!profile) return;
 
     try {
-      const [recentWorkouts, allWorkouts, cyclesData, completedGoalsData, scheduledTrainingsData] = await Promise.all([
+      const [recentWorkouts, allWorkouts, cyclesData, completedGoalsData, activeGoalsData, scheduledTrainingsData] = await Promise.all([
         supabase
           .from('workouts')
           .select('*')
           .eq('user_id', profile.id)
           .order('created_at', { ascending: false })
-          .limit(5),
+          .limit(10), // Changed from 5 to 10
         supabase
           .from('workouts')
           .select('*')
@@ -60,6 +76,13 @@ export default function Home() {
           .order('created_at', { ascending: false })
           .limit(3),
         supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', profile.id)
+          .eq('is_completed', false)
+          .order('deadline', { ascending: true })
+          .limit(5), // Add this query for active goals
+        supabase
           .from('scheduled_trainings')
           .select('*')
           .eq('user_id', profile.id)
@@ -69,6 +92,10 @@ export default function Home() {
           .order('scheduled_time', { ascending: true })
           .limit(5),
       ]);
+
+      console.log('Cycles fetched:', cyclesData); // Add this debug log
+      console.log('Scheduled trainings fetched:', scheduledTrainingsData);
+      console.log('Active goals fetched:', activeGoalsData);
 
       if (recentWorkouts.data) {
         setWorkouts(recentWorkouts.data);
@@ -80,14 +107,21 @@ export default function Home() {
 
       if (cyclesData.data) {
         setCycles(cyclesData.data);
+        console.log('Cycles set:', cyclesData.data); // Add this debug log
       }
 
       if (completedGoalsData.data) {
         setCompletedGoals(completedGoalsData.data);
       }
 
+      if (activeGoalsData.data) {
+        setActiveGoals(activeGoalsData.data);
+        console.log('Active goals set:', activeGoalsData.data);
+      }
+
       if (scheduledTrainingsData.data) {
         setScheduledTrainings(scheduledTrainingsData.data);
+        console.log('Scheduled trainings set:', scheduledTrainingsData.data);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -117,6 +151,11 @@ export default function Home() {
       thisWeek: thisWeekWorkouts.length,
       totalMinutes,
       avgIntensity: Math.round(avgIntensity * 10) / 10,
+      viewAll: {
+        fontSize: 14,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+      },
     });
   };
 
@@ -165,6 +204,41 @@ export default function Home() {
     return Math.min(Math.max((elapsed / total) * 100, 0), 100);
   };
 
+  const getProgressPercentage = (goal: any) => {
+    return Math.min((goal.current_value / goal.target_value) * 100, 100);
+  };
+
+  const handleIncrementGoal = async (goal: any) => {
+    const newValue = goal.current_value + 1;
+    const isCompleted = newValue >= goal.target_value;
+
+    await supabase
+      .from('goals')
+      .update({
+        current_value: newValue,
+        is_completed: isCompleted,
+      })
+      .eq('id', goal.id);
+
+    // Refresh data to update the UI
+    fetchWorkouts();
+  };
+
+  const handleDecrementGoal = async (goal: any) => {
+    const newValue = Math.max(goal.current_value - 1, 0);
+    const isCompleted = newValue >= goal.target_value;
+
+    await supabase
+      .from('goals')
+      .update({
+        current_value: newValue,
+        is_completed: isCompleted,
+      })
+      .eq('id', goal.id);
+
+    fetchWorkouts();
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -183,7 +257,18 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>💪</Text>
+            {profile?.avatar_url ? (
+              <Image 
+                source={{ uri: `${profile.avatar_url}?t=${Date.now()}` }} 
+                style={styles.avatarImage}
+                key={`home-avatar-${profile.avatar_url}`}
+                onError={(e) => {
+                  console.log('Home avatar load error:', e.nativeEvent.error);
+                }}
+              />
+            ) : (
+              <Text style={styles.logoText}>💪</Text>
+            )}
           </View>
           <View>
             <Text style={[styles.greeting, { color: colors.textTertiary }]}>Welcome back,</Text>
@@ -224,6 +309,93 @@ export default function Home() {
           <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Avg Intensity</Text>
         </View>
       </View>
+
+      {/* AdMob Banner Placeholder - Medium Rectangle */}
+      {!isPremium && (
+        <View style={[styles.adBannerContainer, { backgroundColor: colors.surface }]}>
+          <View style={[styles.adBannerPlaceholder, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Text style={[styles.adBannerText, { color: colors.textSecondary }]}>
+              📱 Ad Space
+            </Text>
+            <Text style={[styles.adBannerSubtext, { color: colors.textTertiary }]}>
+              300x250
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Active Goals Section */}
+      {activeGoals.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Active Goals</Text>
+            <TouchableOpacity onPress={() => router.push('/progress')}>
+              <Text style={[styles.viewAll, { color: colors.primary }]}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          {activeGoals.map((goal) => (
+            <View
+              key={goal.id}
+              style={[styles.goalCard, { backgroundColor: colors.surface }]}
+            >
+              <View style={styles.goalHeader}>
+                <View style={styles.goalInfo}>
+                  <Target size={20} color={colors.primary} />
+                  <Text style={[styles.goalType, { color: colors.text }]}>
+                    {goal.goal_type}
+                  </Text>
+                </View>
+                {goal.deadline && (
+                  <Text style={[styles.goalDeadline, { color: colors.textSecondary }]}>
+                    Due: {new Date(goal.deadline).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.goalProgressRow}>
+                <Text style={[styles.goalProgress, { color: colors.textSecondary }]}>
+                  {goal.current_value} / {goal.target_value}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {goal.current_value > 0 && (
+                    <TouchableOpacity
+                      style={[styles.decrementButton, { backgroundColor: '#999', marginLeft: 4 }]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDecrementGoal(goal);
+                      }}
+                    >
+                      <Minus size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.incrementButton, { backgroundColor: colors.primary }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleIncrementGoal(goal);
+                    }}
+                  >
+                    <Text style={styles.incrementText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={[styles.progressBarContainer, { backgroundColor: colors.background }]}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    { width: `${getProgressPercentage(goal)}%`, backgroundColor: colors.secondary }
+                  ]}
+                />
+              </View>
+              <Text style={[styles.progressText, { color: colors.secondary }]}>
+                {Math.round(getProgressPercentage(goal))}% complete
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {scheduledTrainings.length > 0 && (
         <View style={styles.section}>
@@ -307,27 +479,38 @@ export default function Home() {
         </View>
       )}
 
-      {completedGoals.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Completed Goals</Text>
-
-          {completedGoals.map((goal) => (
-            <View key={goal.id} style={[styles.goalCard, { backgroundColor: colors.surface }]}>
-              <View style={styles.goalContent}>
-                <Text style={styles.goalEmoji}>🏆</Text>
-                <View style={styles.goalInfo}>
-                  <Text style={[styles.goalTitle, { color: colors.text }]}>
-                    {goal.goal_type}
-                  </Text>
-                  <Text style={[styles.goalCompleted, { color: '#10B981' }]}>
-                    ✓ Completed
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Completed</Text>
+          <TouchableOpacity onPress={() => router.push('/progress')}>
+            <Text style={[styles.viewAll, { color: colors.primary }]}>View All</Text>
+          </TouchableOpacity>
         </View>
-      )}
+        {completedGoals.length === 0 ? (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              No completed goals yet
+            </Text>
+          </View>
+        ) : (
+          completedGoals.map((goal) => (
+            <View
+              key={goal.id}
+              style={[styles.completedGoalCard, { backgroundColor: colors.surface }]}
+            >
+              <View style={styles.completedGoalHeader}>
+                <Text style={[styles.completedGoalEmoji]}>🎯</Text>
+                <Text style={[styles.completedGoalType, { color: colors.primary }]}>
+                  {goal.goal_type}
+                </Text>
+              </View>
+              <Text style={[styles.completedGoalText, { color: colors.success }]}>
+                ✓ Completed
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
@@ -376,10 +559,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   loadingText: {
     fontSize: 16,
     textAlign: 'center',
     marginTop: 100,
+  },
+  viewAll: {
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   header: {
     flexDirection: 'row',
@@ -562,30 +756,95 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   goalCard: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  goalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  goalType: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  goalDeadline: {
+    fontSize: 12,
+    color: '#999',
+  },
+  goalProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  goalProgress: {
+    fontSize: 14,
+    color: '#999',
+  },
+  incrementButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E63946',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  decrementButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#999',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  incrementText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  emptyCard: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  completedGoalCard: {
+    backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFD700',
+    borderLeftColor: '#10B981',
   },
-  goalContent: {
+  completedGoalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
+    marginBottom: 8,
   },
-  goalEmoji: {
-    fontSize: 24,
+  completedGoalEmoji: {
+    fontSize: 20,
   },
-  goalInfo: {
-    flex: 1,
-  },
-  goalTitle: {
+  completedGoalType: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    color: '#FFF',
   },
-  goalCompleted: {
-    fontSize: 12,
+  completedGoalText: {
+    fontSize: 14,
+    color: '#10B981',
     fontWeight: '600',
   },
   trainingCard: {
@@ -623,5 +882,36 @@ const styles = StyleSheet.create({
   },
   trainingDescription: {
     fontSize: 14,
+  },
+  adBannerContainer: {
+    marginHorizontal: 12,
+    marginVertical: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adBannerPlaceholder: {
+    width: 300,
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  adBannerText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  adBannerSubtext: {
+    fontSize: 12,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
   },
 });

@@ -1,10 +1,14 @@
-import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { X, Plus, TrendingUp, TrendingDown } from 'lucide-react-native';
+import React from 'react';
+import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity } from 'react-native';
+import { X, Plus, TrendingUp, TrendingDown, Pencil, Trash2 } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { convertWeight } from '@/lib/weightUtils';
+import { convertCircumference, getCircumferenceUnit } from '@/lib/weightUtils';
 
 type Measurement = {
   id: string;
   weight: number | null;
+  weight_unit?: string;
   arm_circumference: number | null;
   forearm_circumference: number | null;
   wrist_circumference: number | null;
@@ -17,11 +21,22 @@ type Props = {
   onClose: () => void;
   measurements: Measurement[];
   onAddNew: () => void;
-  weightUnit: string;
+  onEdit?: (measurement: Measurement) => void;
+  onDelete?: (measurementId: string) => void;
+  weightUnit: 'kg' | 'lbs';
 };
 
-export function MeasurementsModal({ visible, onClose, measurements, onAddNew, weightUnit }: Props) {
+export function MeasurementsModal({ 
+  visible, 
+  onClose, 
+  measurements, 
+  onAddNew, 
+  onEdit,
+  onDelete,
+  weightUnit 
+}: Props) {
   const { colors } = useTheme();
+  const circumferenceUnit = getCircumferenceUnit(weightUnit);
 
   const calculateChange = (current: number | null, previous: number | null) => {
     if (!current || !previous) return null;
@@ -37,6 +52,20 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
     const current = measurements[index][field];
     const previous = measurements[index + 1][field];
     return calculateChange(current, previous);
+  };
+
+  const handleEdit = (measurement: Measurement) => {
+    // Validation before allowing edit (optional, but for consistency)
+    if (
+      (measurement.weight !== null && (isNaN(Number(measurement.weight)) || Number(measurement.weight) <= 0)) ||
+      (measurement.arm_circumference !== null && (isNaN(Number(measurement.arm_circumference)) || Number(measurement.arm_circumference) <= 0)) ||
+      (measurement.forearm_circumference !== null && (isNaN(Number(measurement.forearm_circumference)) || Number(measurement.forearm_circumference) <= 0)) ||
+      (measurement.wrist_circumference !== null && (isNaN(Number(measurement.wrist_circumference)) || Number(measurement.wrist_circumference) <= 0))
+    ) {
+      alert('All measurement values must be positive numbers.');
+      return;
+    }
+    onEdit?.(measurement);
   };
 
   return (
@@ -64,14 +93,30 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
             measurements.map((measurement, index) => (
               <View key={measurement.id} style={[styles.measurementCard, { backgroundColor: colors.surface }]}>
                 <View style={styles.measurementHeader}>
-                  <Text style={[styles.measurementDate, { color: colors.primary }]}>
-                    {new Date(measurement.measured_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </Text>
-                  {index === 0 && <Text style={styles.latestBadge}>Latest</Text>}
+                  <View style={styles.measurementHeaderLeft}>
+                    <Text style={[styles.measurementDate, { color: colors.primary }]}>
+                      {new Date(measurement.measured_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                    {index === 0 && <Text style={styles.latestBadge}>Latest</Text>}
+                  </View>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEdit(measurement)}
+                    >
+                      <Pencil size={16} color="#2A7DE1" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => onDelete?.(measurement.id)}
+                    >
+                      <Trash2 size={16} color="#E63946" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={styles.measurementGrid}>
@@ -80,7 +125,11 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
                       <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Weight</Text>
                       <View style={styles.measurementValueRow}>
                         <Text style={[styles.measurementValue, { color: colors.text }]}>
-                          {measurement.weight} {weightUnit}
+                          {Math.round(convertWeight(
+                            measurement.weight,
+                            (measurement.weight_unit || 'lbs') as 'kg' | 'lbs',
+                            weightUnit
+                          ))} {weightUnit}
                         </Text>
                         {getMeasurementChange(index, 'weight') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'weight')!.isIncrease ? styles.changeUp : styles.changeDown]}>
@@ -102,7 +151,12 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
                     <View style={styles.measurementItem}>
                       <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Arm</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={[styles.measurementValue, { color: colors.text }]}>{measurement.arm_circumference} cm</Text>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>
+                          {circumferenceUnit === 'in' 
+                            ? Math.round(convertCircumference(measurement.arm_circumference, weightUnit))
+                            : convertCircumference(measurement.arm_circumference, weightUnit).toFixed(1)
+                          } {circumferenceUnit}
+                        </Text>
                         {getMeasurementChange(index, 'arm_circumference') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'arm_circumference')!.isIncrease ? styles.changeUp : styles.changeDown]}>
                             {getMeasurementChange(index, 'arm_circumference')!.isIncrease ? (
@@ -123,7 +177,12 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
                     <View style={styles.measurementItem}>
                       <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Forearm</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={[styles.measurementValue, { color: colors.text }]}>{measurement.forearm_circumference} cm</Text>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>
+                          {circumferenceUnit === 'in' 
+                            ? Math.round(convertCircumference(measurement.forearm_circumference, weightUnit))
+                            : convertCircumference(measurement.forearm_circumference, weightUnit).toFixed(1)
+                          } {circumferenceUnit}
+                        </Text>
                         {getMeasurementChange(index, 'forearm_circumference') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'forearm_circumference')!.isIncrease ? styles.changeUp : styles.changeDown]}>
                             {getMeasurementChange(index, 'forearm_circumference')!.isIncrease ? (
@@ -144,7 +203,12 @@ export function MeasurementsModal({ visible, onClose, measurements, onAddNew, we
                     <View style={styles.measurementItem}>
                       <Text style={[styles.measurementLabel, { color: colors.textTertiary }]}>Wrist</Text>
                       <View style={styles.measurementValueRow}>
-                        <Text style={[styles.measurementValue, { color: colors.text }]}>{measurement.wrist_circumference} cm</Text>
+                        <Text style={[styles.measurementValue, { color: colors.text }]}>
+                          {circumferenceUnit === 'in' 
+                            ? Math.round(convertCircumference(measurement.wrist_circumference, weightUnit))
+                            : convertCircumference(measurement.wrist_circumference, weightUnit).toFixed(1)
+                          } {circumferenceUnit}
+                        </Text>
                         {getMeasurementChange(index, 'wrist_circumference') && (
                           <View style={[styles.changeIndicator, getMeasurementChange(index, 'wrist_circumference')!.isIncrease ? styles.changeUp : styles.changeDown]}>
                             {getMeasurementChange(index, 'wrist_circumference')!.isIncrease ? (
@@ -231,6 +295,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  measurementHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: '#2A7DE144',
+    borderRadius: 8,
+    padding: 8,
+  },
+  deleteButton: {
+    backgroundColor: '#E6394644',
+    borderRadius: 8,
+    padding: 8,
   },
   measurementDate: {
     fontSize: 16,

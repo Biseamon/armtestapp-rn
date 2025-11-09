@@ -8,6 +8,18 @@ type PaywallModalProps = {
   feature: string;
 };
 
+const premiumFeatures = [
+  '📊 Advanced Analytics (6 chart types)',
+  '📈 PR Timeline & Consistency Tracking',
+  '📏 Body Measurements Tracking',
+  '📄 Detailed Progress Reports',
+  '🎯 Unlimited Goals',
+  '💪 Unlimited Workouts',
+  '📅 Unlimited Scheduled Trainings',
+  '🏋️ Unlimited Training Cycles',
+  '🚫 Ad-Free Experience',
+];
+
 export function PaywallModal({ visible, onClose, onUpgrade, feature }: PaywallModalProps) {
   const handleUpgrade = () => {
     const stripePaymentUrl = 'https://buy.stripe.com/test_00000000';
@@ -47,11 +59,9 @@ export function PaywallModal({ visible, onClose, onUpgrade, feature }: PaywallMo
 
           <View style={styles.benefitsContainer}>
             <Text style={styles.benefitsTitle}>Premium Benefits:</Text>
-            <Text style={styles.benefit}>✓ Unlimited workout tracking</Text>
-            <Text style={styles.benefit}>✓ Advanced progress analytics</Text>
-            <Text style={styles.benefit}>✓ Custom training programs</Text>
-            <Text style={styles.benefit}>✓ No advertisements</Text>
-            <Text style={styles.benefit}>✓ Export your data</Text>
+            {premiumFeatures.map((benefit, index) => (
+              <Text key={index} style={styles.benefit}>{benefit}</Text>
+            ))}
           </View>
 
           <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
