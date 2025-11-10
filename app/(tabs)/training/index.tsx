@@ -11,7 +11,7 @@ import {
   Platform,
   useColorScheme,
 } from 'react-native';
-import { useFocusEffect, router } from 'expo-router';
+import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
@@ -33,6 +33,7 @@ export default function Training() {
   const { profile, isPremium } = useAuth();
   const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
   const colorScheme = useColorScheme();
+  const params = useLocalSearchParams();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
@@ -64,6 +65,23 @@ export default function Training() {
         fetchData();
       }
     }, [profile])
+  );
+
+  // Handle edit workout from calendar
+  useFocusEffect(
+    useCallback(() => {
+      const editWorkoutId = params.editWorkoutId as string | undefined;
+
+      if (editWorkoutId && workouts.length > 0) {
+        const workoutToEdit = workouts.find(w => w.id === editWorkoutId);
+        if (workoutToEdit) {
+          // Clear the parameter to avoid re-triggering
+          router.setParams({ editWorkoutId: undefined });
+          // Trigger edit
+          handleEditWorkout(workoutToEdit);
+        }
+      }
+    }, [params.editWorkoutId, workouts])
   );
 
   const fetchData = async () => {
@@ -259,6 +277,12 @@ export default function Training() {
   };
 
   const handleAddCycle = () => {
+    // Check cycle limit for free users
+    if (!isPremium && cycles.length >= 1) {
+      setShowPaywall(true);
+      return;
+    }
+
     setEditingCycle(null);
     resetCycleForm();
     setShowCycleModal(true);

@@ -233,7 +233,7 @@ export default function Profile() {
   const handleUpgrade = () => {
     Alert.alert(
       'Upgrade to Premium',
-      'Premium features include:\n\n✓ Unlimited workout tracking\n✓ Advanced analytics\n✓ Custom training programs\n✓ No advertisements\n✓ Export data\n\nContact support to upgrade your account.',
+      'Premium features include:\n\n✓ Unlimited workout tracking\n✓ Advanced analytics\n✓ No advertisements\n✓ Export data\n\nContact support to upgrade your account.',
       [{ text: 'OK' }]
     );
   };
@@ -415,10 +415,6 @@ export default function Profile() {
             <View style={styles.benefitItem}>
               <Text style={[styles.benefitIcon, { color: colors.primary }]}>✓</Text>
               <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Advanced progress analytics</Text>
-            </View>
-            <View style={styles.benefitItem}>
-              <Text style={[styles.benefitIcon, { color: colors.primary }]}>✓</Text>
-              <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Custom training programs</Text>
             </View>
             <View style={styles.benefitItem}>
               <Text style={[styles.benefitIcon, { color: colors.primary }]}>✓</Text>

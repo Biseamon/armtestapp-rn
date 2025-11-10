@@ -85,7 +85,7 @@ const guideSteps: GuideStep[] = [
       '🎯 Choose cycle type based on goals',
       '💪 Track all workouts within the cycle',
       '📊 Monitor cycle progress percentage',
-      '✅ Only one cycle can be active at a time',
+      '✅ Multiple cycle can be active at a time',
     ],
     visualDemo: {
       title: 'Cycle Types:',
@@ -130,7 +130,7 @@ const guideSteps: GuideStep[] = [
       '➕ Increment progress with + button',
       '✅ Auto-completion when target is reached',
       '🏆 Goals turn gold when completed',
-      '🆓 Free users: 3 goals | Premium: Unlimited',
+      '🆓 Unlimited goals',
     ],
     visualDemo: {
       title: 'Goal Examples:',
@@ -241,8 +241,7 @@ const guideSteps: GuideStep[] = [
       '⚖️ Switch between lbs and kg (all data converts)',
       '🌓 Toggle light/dark theme for comfort',
       '🖼️ Upload custom avatar photo',
-      '📧 Update email and password',
-      '⭐ Upgrade to Premium for unlimited features',
+      '⭐ Upgrade to Premium for unlimited features and no ads',
       '❓ Access this guide anytime from here',
     ],
     visualDemo: {

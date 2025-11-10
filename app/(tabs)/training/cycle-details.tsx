@@ -311,7 +311,7 @@ export default function CycleDetails() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/training')}>
-            <ArrowLeft size={24} color="#FFF" />
+            <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>Loading...</Text>
         </View>
@@ -323,7 +323,7 @@ export default function CycleDetails() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/training')} style={styles.backButton}>
-          <ArrowLeft size={24} color="#FFF" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
@@ -338,50 +338,36 @@ export default function CycleDetails() {
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }}>
         <AdBanner />
 
-        <View style={styles.cycleInfoCard}>
-          <Text style={styles.cycleType}>
+        <View style={[styles.cycleInfoCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+          <Text style={[styles.cycleType, { color: colors.primary }]}>
             {cycle.cycle_type.replace(/_/g, ' ').toUpperCase()}
           </Text>
-          <Text style={styles.cycleDates}>
+          <Text style={[styles.cycleDates, { color: colors.textSecondary }]}>
             {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
           </Text>
           {cycle.description && (
-            <Text style={styles.cycleDescription}>{cycle.description}</Text>
+            <Text style={[styles.cycleDescription, { color: colors.textSecondary }]}>{cycle.description}</Text>
           )}
         </View>
 
-        {!isPremium && (
-          <View style={styles.limitCard}>
-            <Text style={styles.limitText}>
-              Free: {workoutCount}/3 trainings in this cycle
-            </Text>
-            <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={() => setShowPaywall(true)}
-            >
-              <Text style={styles.upgradeText}>Upgrade for Unlimited</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Trainings ({workoutCount})
           </Text>
           {workouts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No trainings yet</Text>
-              <Text style={styles.emptySubtext}>Add your first training!</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No trainings yet</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>Add your first training!</Text>
             </View>
           ) : (
             workouts.map((workout) => (
-              <View key={workout.id} style={styles.workoutCard}>
+              <View key={workout.id} style={[styles.workoutCard, { backgroundColor: colors.surface }]}>
                 <View style={styles.workoutHeader}>
                   <View style={styles.workoutInfo}>
-                    <Text style={styles.workoutType}>
+                    <Text style={[styles.workoutType, { color: colors.primary }]}>
                       {workout.workout_type.replace(/_/g, ' ').toUpperCase()}
                     </Text>
-                    <Text style={styles.workoutDate}>
+                    <Text style={[styles.workoutDate, { color: colors.textSecondary }]}>
                       {formatDate(workout.created_at)}
                     </Text>
                   </View>
@@ -390,27 +376,27 @@ export default function CycleDetails() {
                       style={styles.iconButton}
                       onPress={() => handleEditWorkout(workout)}
                     >
-                      <Pencil size={18} color="#E63946" />
+                      <Pencil size={18} color={colors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.iconButton}
                       onPress={() => handleDeleteWorkout(workout)}
                     >
-                      <Trash2 size={18} color="#FF6B6B" />
+                      <Trash2 size={18} color={colors.error} />
                     </TouchableOpacity>
                   </View>
                 </View>
                 <View style={styles.workoutDetails}>
-                  <Text style={styles.workoutDetail}>
+                  <Text style={[styles.workoutDetail, { color: colors.textSecondary }]}>
                     {workout.duration_minutes} min
                   </Text>
-                  <Text style={styles.workoutDivider}>•</Text>
-                  <Text style={styles.workoutDetail}>
+                  <Text style={[styles.workoutDivider, { color: colors.textTertiary }]}>•</Text>
+                  <Text style={[styles.workoutDetail, { color: colors.textSecondary }]}>
                     Intensity: {workout.intensity}/10
                   </Text>
                 </View>
                 {workout.notes && (
-                  <Text style={styles.workoutNotes} numberOfLines={2}>
+                  <Text style={[styles.workoutNotes, { color: colors.textSecondary }]} numberOfLines={2}>
                     {workout.notes}
                   </Text>
                 )}
@@ -425,32 +411,34 @@ export default function CycleDetails() {
         animationType="slide"
         onRequestClose={() => setShowWorkoutModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingWorkout ? 'Edit Training' : 'Log Training'}
             </Text>
             <TouchableOpacity onPress={() => setShowWorkoutModal(false)}>
-              <X size={24} color="#999" />
+              <X size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
-            <Text style={styles.label}>Workout Type</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Workout Type</Text>
             <View style={styles.typeContainer}>
               {workoutTypes.map((type) => (
                 <TouchableOpacity
                   key={type.value}
                   style={[
                     styles.typeButton,
-                    workoutType === type.value && styles.typeButtonActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    workoutType === type.value && [styles.typeButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setWorkoutType(type.value)}
                 >
                   <Text
                     style={[
                       styles.typeButtonText,
-                      workoutType === type.value && styles.typeButtonTextActive,
+                      { color: colors.textSecondary },
+                      workoutType === type.value && [styles.typeButtonTextActive, { color: '#FFF' }],
                     ]}
                   >
                     {type.label}
@@ -459,73 +447,73 @@ export default function CycleDetails() {
               ))}
             </View>
 
-            <Text style={styles.label}>Duration (minutes)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Duration (minutes)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={duration}
               onChangeText={setDuration}
               keyboardType="number-pad"
               placeholder="30"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
             />
 
-            <Text style={styles.label}>Intensity (1-10)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Intensity (1-10)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={intensity}
               onChangeText={setIntensity}
               keyboardType="number-pad"
               placeholder="5"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
             />
 
-            <Text style={styles.label}>Notes</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Notes</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
               value={notes}
               onChangeText={setNotes}
               multiline
               numberOfLines={3}
               placeholder="How did it go?"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textTertiary}
             />
 
             <View style={styles.exercisesSection}>
               <View style={styles.exercisesHeader}>
-                <Text style={styles.label}>Exercises (Optional)</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Exercises (Optional)</Text>
                 <TouchableOpacity
                   style={styles.addExerciseButton}
                   onPress={handleAddExercise}
                 >
-                  <Plus size={20} color="#E63946" />
-                  <Text style={styles.addExerciseText}>Add Exercise</Text>
+                  <Plus size={20} color={colors.primary} />
+                  <Text style={[styles.addExerciseText, { color: colors.primary }]}>Add Exercise</Text>
                 </TouchableOpacity>
               </View>
 
               {exercises.map((exercise, index) => (
-                <View key={index} style={styles.exerciseCard}>
+                <View key={index} style={[styles.exerciseCard, { backgroundColor: colors.surface }]}>
                   <View style={styles.exerciseCardHeader}>
-                    <Text style={styles.exerciseCardTitle}>Exercise {index + 1}</Text>
+                    <Text style={[styles.exerciseCardTitle, { color: colors.text }]}>Exercise {index + 1}</Text>
                     <TouchableOpacity onPress={() => handleRemoveExercise(index)}>
-                      <X size={20} color="#999" />
+                      <X size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
 
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                     value={exercise.exercise_name}
                     onChangeText={(val) =>
                       handleUpdateExercise(index, 'exercise_name', val)
                     }
                     placeholder="Exercise name"
-                    placeholderTextColor="#666"
+                    placeholderTextColor={colors.textTertiary}
                   />
 
                   <View style={styles.exerciseRow}>
                     <View style={styles.exerciseInputGroup}>
-                      <Text style={styles.smallLabel}>Sets</Text>
+                      <Text style={[styles.smallLabel, { color: colors.textSecondary }]}>Sets</Text>
                       <TextInput
-                        style={styles.smallInput}
+                        style={[styles.smallInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                         value={String(exercise.sets)}
                         onChangeText={(val) =>
                           handleUpdateExercise(index, 'sets', parseInt(val) || 0)
@@ -535,9 +523,9 @@ export default function CycleDetails() {
                     </View>
 
                     <View style={styles.exerciseInputGroup}>
-                      <Text style={styles.smallLabel}>Reps</Text>
+                      <Text style={[styles.smallLabel, { color: colors.textSecondary }]}>Reps</Text>
                       <TextInput
-                        style={styles.smallInput}
+                        style={[styles.smallInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                         value={String(exercise.reps)}
                         onChangeText={(val) =>
                           handleUpdateExercise(index, 'reps', parseInt(val) || 0)
@@ -547,9 +535,9 @@ export default function CycleDetails() {
                     </View>
 
                     <View style={styles.exerciseInputGroup}>
-                      <Text style={styles.smallLabel}>Weight ({profile?.weight_unit || 'lbs'})</Text>
+                      <Text style={[styles.smallLabel, { color: colors.textSecondary }]}>Weight ({profile?.weight_unit || 'lbs'})</Text>
                       <TextInput
-                        style={styles.smallInput}
+                        style={[styles.smallInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                         value={String(Math.round(convertFromLbs(exercise.weight_lbs, profile?.weight_unit || 'lbs')))}
                         onChangeText={(val) => {
                           const inputValue = parseInt(val) || 0;

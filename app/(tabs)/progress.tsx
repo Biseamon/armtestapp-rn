@@ -620,7 +620,7 @@ export default function Progress() {
               • Track progress manually with the + button{'\n'}
               • Toggle completion status by tapping the goal card{'\n'}
               • Edit or delete goals with the action buttons{'\n'}
-              • Free users can track up to 3 goals
+              • Free users can create one cycle at a time.
             </Text>
           </View>
 
@@ -1246,10 +1246,10 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
           )}
 
           {goals.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Target size={40} color="#666" />
-              <Text style={styles.emptyText}>No goals yet</Text>
-              <Text style={styles.emptySubtext}>Set your first training goal!</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+              <Target size={40} color={colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No goals yet</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>Set your first training goal!</Text>
             </View>
           ) : (
             goals.map((goal) => (
@@ -1379,10 +1379,10 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
           </View>
 
           {getLatestPRsByType().length === 0 ? (
-            <View style={styles.emptyState}>
-              <TrendingUp size={40} color="#666" />
-              <Text style={styles.emptyText}>No PRs recorded</Text>
-              <Text style={styles.emptySubtext}>Track your strength progress!</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+              <TrendingUp size={40} color={colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No PRs recorded</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>Track your strength progress!</Text>
             </View>
           ) : (
             getLatestPRsByType().map((test) => {
@@ -2067,18 +2067,15 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: '#2A2A2A',
     borderRadius: 12,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
     marginTop: 12,
   },
   emptySubtext: {
     fontSize:  14,
-    color: '#555',
     marginTop: 4,
   },
   goalCard: {

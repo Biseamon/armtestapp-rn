@@ -513,7 +513,12 @@ export default function Home() {
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/training')}>
+            <Text style={[styles.viewAll, { color: colors.primary }]}>View All</Text>
+          </TouchableOpacity>
+        </View>
 
         {workouts.length === 0 ? (
           <View style={styles.emptyState}>
