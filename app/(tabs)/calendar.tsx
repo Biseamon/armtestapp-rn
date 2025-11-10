@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase, Workout, StrengthTest } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, X, TrendingUp, Pencil, Trash2 } from 'lucide-react-native';
 import { convertWeight, formatWeight } from '@/lib/weightUtils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Cycle {
   id: string;
@@ -44,6 +45,7 @@ interface DayData {
 export default function CalendarScreen() {
   const { colors } = useTheme();
   const { profile, isPremium } = useAuth(); // Add isPremium here
+  const insets = useSafeAreaInsets();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -441,7 +443,7 @@ export default function CalendarScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={[styles.title, { color: colors.text }]}>Calendar</Text>
       </View>
 
@@ -781,7 +783,6 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: 60,
   },
   title: {
     fontSize: 32,

@@ -33,12 +33,16 @@ import { writeAsStringAsync, documentDirectory, cacheDirectory } from 'expo-file
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useResponsive } from '@/lib/useResponsive';
 
 const { width } = Dimensions.get('window');
 
 export default function Progress() {
   const { profile, isPremium } = useAuth();
   const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
+  const insets = useSafeAreaInsets();
+  const { isTablet } = useResponsive();
   const colorScheme = useColorScheme();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [strengthTests, setStrengthTests] = useState<StrengthTest[]>([]);
@@ -1139,7 +1143,7 @@ const handleShareReport = async (type: 'pdf' | 'social') => {
       {renderTestTooltipModal()}
       {renderGoalsTooltipModal()}
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={[styles.title, { color: colors.text }]}>Progress</Text>
         <TouchableOpacity
           style={styles.reportButton}
@@ -1962,7 +1966,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
   },
   title: {
     fontSize: 32,
@@ -2224,7 +2227,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
     borderBottomWidth: 1,
   },
   modalTitle: {

@@ -17,11 +17,15 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase, Workout, Cycle } from '@/lib/supabase';
 import { AdBanner } from '@/components/AdBanner';
 import { Calendar, TrendingUp, Target, Clock, Minus } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useResponsive } from '@/lib/useResponsive';
 
 export default function Home() {
   const { profile, isPremium } = useAuth();
   const { colors } = useTheme();
   const colorScheme = useColorScheme(); // Add this line
+  const insets = useSafeAreaInsets();
+  const { columns, isTablet } = useResponsive();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [completedGoals, setCompletedGoals] = useState<any[]>([]);
@@ -254,7 +258,7 @@ export default function Home() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.headerContent}>
           <View style={styles.logoPlaceholder}>
             {profile?.avatar_url ? (
@@ -285,25 +289,25 @@ export default function Home() {
       <AdBanner />
 
       <View style={styles.statsGrid}>
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, minWidth: isTablet ? '30%' : '45%' }]}>
           <Target size={24} color={colors.primary} />
           <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalWorkouts}</Text>
           <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Total Workouts</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, minWidth: isTablet ? '30%' : '45%' }]}>
           <Calendar size={24} color={colors.primary} />
           <Text style={[styles.statValue, { color: colors.text }]}>{stats.thisWeek}</Text>
           <Text style={[styles.statLabel, { color: colors.textTertiary }]}>This Week</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, minWidth: isTablet ? '30%' : '45%' }]}>
           <Clock size={24} color={colors.primary} />
           <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalMinutes}</Text>
           <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Total Minutes</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, minWidth: isTablet ? '30%' : '45%' }]}>
           <TrendingUp size={24} color={colors.primary} />
           <Text style={[styles.statValue, { color: colors.text }]}>{stats.avgIntensity}</Text>
           <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Avg Intensity</Text>
@@ -585,7 +589,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
   },
   headerContent: {
     flexDirection: 'row',
@@ -631,7 +634,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    minWidth: '45%',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',

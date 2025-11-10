@@ -20,6 +20,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { Plus, X, Save, Pencil, Trash2, Calendar as CalendarIcon, Clock } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { convertFromLbs, convertToLbs, convertWeight } from '@/lib/weightUtils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Exercise = {
   exercise_name: string;
@@ -34,6 +35,7 @@ export default function Training() {
   const { colors, theme } = useTheme(); // <-- get theme from ThemeContext
   const colorScheme = useColorScheme();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
@@ -425,7 +427,7 @@ export default function Training() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={[styles.title, { color: colors.text }]}>Training</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
@@ -569,7 +571,7 @@ export default function Training() {
         onRequestClose={() => setShowWorkoutModal(false)}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border, paddingTop: insets.top + 20 }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingWorkout ? 'Edit Workout' : 'Log Workout'}
             </Text>
@@ -778,7 +780,7 @@ export default function Training() {
         onRequestClose={() => setShowCycleModal(false)}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border, paddingTop: insets.top + 20 }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingCycle ? 'Edit Training Cycle' : 'New Training Cycle'}
             </Text>
@@ -982,7 +984,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
   },
   title: {
     fontSize: 32,
@@ -1190,7 +1191,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
     borderBottomWidth: 1,
   },
   modalTitle: {
