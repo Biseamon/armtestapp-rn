@@ -8,6 +8,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, Profile } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import * as AuthSession from 'expo-auth-session';
+import Constants from 'expo-constants';
 
 /**
  * Type definition for the authentication context
@@ -23,6 +25,8 @@ type AuthContextType = {
   signInWithApple: () => Promise<{ error: any }>;
   signInWithFacebook: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: any }>; // Send password reset email
+  updatePassword: (newPassword: string) => Promise<{ error: any }>; // Update user's password
   isPremium: boolean;                 // Whether user has premium access
   refreshProfile: () => Promise<void>; // Manually refresh profile data
 };
@@ -207,6 +211,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
+   * Send password reset email
+   * @param email - User's email address
+   * @returns Object containing error if reset failed
+   *
+   * Note: This only works for users who signed up with email/password.
+   * OAuth users (Google, Facebook, Apple) should use their provider's recovery.
+   */
+  const resetPassword = async (email: string) => {
+    // Determine the redirect URL based on environment
+    // In Expo development, use the Expo redirect URL
+    // In production, use the custom scheme
+    let redirectTo: string;
+
+    if (__DEV__ && Constants.expoConfig?.hostUri) {
+      // Expo development mode - use makeRedirectUri to get the correct Expo URL
+      redirectTo = AuthSession.makeRedirectUri({
+        path: '(auth)/reset-password',
+      });
+      console.log('Using Expo redirect URL for password reset:', redirectTo);
+    } else {
+      // Production mode - use custom scheme
+      redirectTo = 'armwrestlingpro://(auth)/reset-password';
+      console.log('Using production redirect URL for password reset:', redirectTo);
+    }
+
+    console.log('Sending password reset email to:', email, 'with redirect:', redirectTo);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+    return { error };
+  };
+
+  /**
+   * Update user's password
+   * @param newPassword - The new password
+   * @returns Object containing error if update failed
+   *
+   * This should be called after the user clicks the reset link in their email
+   * and is redirected back to the app.
+   */
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    return { error };
+  };
+
+  /**
    * Manually refresh the user's profile data
    * Useful after updating profile settings
    */
@@ -232,6 +284,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithApple,  // Apple OAuth login
         signInWithFacebook, // Facebook OAuth login
         signOut,          // Logout function
+        resetPassword,    // Send password reset email
+        updatePassword,   // Update user's password
         isPremium,        // Premium status
         refreshProfile,   // Refresh profile function
       }}

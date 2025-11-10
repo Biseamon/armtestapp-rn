@@ -167,6 +167,15 @@ export default function Login() {
               secureTextEntry
               editable={!loading}
             />
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/forgot-password')}
+              disabled={loading}
+              style={styles.forgotPasswordLink}
+            >
+              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -324,5 +333,13 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  forgotPasswordLink: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -8,12 +8,13 @@ import {
   Modal,
   Dimensions,
   Platform,
+  Alert,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase, Workout, StrengthTest } from '@/lib/supabase';
-import { ChevronLeft, ChevronRight, X, TrendingUp } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, X, TrendingUp, Pencil, Trash2 } from 'lucide-react-native';
 import { convertWeight, formatWeight } from '@/lib/weightUtils';
 
 interface Cycle {
@@ -405,6 +406,39 @@ export default function CalendarScreen() {
     return workouts.filter((w) => w.created_at.split('T')[0] === dateStr);
   };
 
+  const handleEditWorkout = (workout: Workout) => {
+    setShowDayModal(false);
+    // Navigate to training screen and trigger edit
+    router.push('/(tabs)/training');
+    // The edit will be handled by the training screen
+    // We'll pass the workout ID as a query parameter
+    setTimeout(() => {
+      router.push({
+        pathname: '/(tabs)/training',
+        params: { editWorkoutId: workout.id }
+      });
+    }, 100);
+  };
+
+  const handleDeleteWorkout = (workout: Workout) => {
+    Alert.alert(
+      'Delete Workout',
+      'Are you sure you want to delete this workout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('workouts').delete().eq('id', workout.id);
+            // Refresh data
+            fetchData();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
@@ -640,9 +674,25 @@ export default function CalendarScreen() {
                   </Text>
                   {getWorkoutsForDate(selectedDate).map((workout) => (
                     <View key={workout.id} style={[styles.workoutCard, { backgroundColor: colors.surface }]}>
-                      <Text style={[styles.workoutType, { color: colors.primary, marginBottom: 12 }]}>
-                        {workout.workout_type?.replace(/_/g, ' ').toUpperCase() || 'WORKOUT'}
-                      </Text>
+                      <View style={styles.workoutCardHeader}>
+                        <Text style={[styles.workoutType, { color: colors.primary }]}>
+                          {workout.workout_type?.replace(/_/g, ' ').toUpperCase() || 'WORKOUT'}
+                        </Text>
+                        <View style={styles.workoutActions}>
+                          <TouchableOpacity
+                            style={styles.workoutActionButton}
+                            onPress={() => handleEditWorkout(workout)}
+                          >
+                            <Pencil size={18} color={colors.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.workoutActionButton}
+                            onPress={() => handleDeleteWorkout(workout)}
+                          >
+                            <Trash2 size={18} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                       <View style={styles.workoutStats}>
                         <View style={styles.workoutStat}>
                           <Text style={[styles.workoutStatLabel, { color: colors.textTertiary }]}>Duration</Text>
@@ -886,6 +936,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+  },
+  workoutCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  workoutActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  workoutActionButton: {
+    padding: 8,
   },
   workoutStats: {
     flexDirection: 'row',
