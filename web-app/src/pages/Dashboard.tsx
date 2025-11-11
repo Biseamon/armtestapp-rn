@@ -109,19 +109,19 @@ export default function Dashboard() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
             Welcome back, {profile?.full_name || 'Athlete'}!
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-2 text-lg">
             Here's your training overview
           </p>
         </div>
         <Link
           to="/training"
-          className="inline-flex items-center px-4 py-2 bg-primary hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+          className="inline-flex items-center px-6 py-3 bg-primary hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-lg hover:shadow-xl"
         >
           <Plus className="w-5 h-5 mr-2" />
           Log Workout
@@ -129,7 +129,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -171,7 +171,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Active Goals */}
         {activeGoals.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -253,7 +253,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Workouts */}
-      <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Workouts</h2>
@@ -306,7 +306,7 @@ export default function Dashboard() {
 
       {/* Recently Completed Goals */}
       {completedGoals.length > 0 && (
-        <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recently Completed</h2>
           </div>
