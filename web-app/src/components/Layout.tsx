@@ -25,12 +25,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Sidebar Navigation - Desktop Only */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-gradient-to-b from-maroon-900 to-maroon-950 dark:from-gray-900 dark:to-gray-950 border-r border-maroon-800 dark:border-gray-700">
         <div className="flex flex-col flex-1 min-h-0">
           {/* Logo */}
-          <div className="flex items-center h-16 px-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center h-16 px-6 border-b border-maroon-800 dark:border-gray-700">
             <span className="text-2xl">💪</span>
-            <span className="ml-3 text-lg font-bold text-gray-900 dark:text-white">
+            <span className="ml-3 text-lg font-bold text-white">
               Arm Wrestling Pro
             </span>
           </div>
@@ -44,10 +44,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+                  className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
                     isActive
-                      ? 'bg-red-50 dark:bg-red-900/20 text-primary'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-white/10 text-white shadow-lg'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <Icon className="w-5 h-5 mr-3" />
@@ -58,16 +58,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* User Section */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="p-4 border-t border-maroon-800 dark:border-gray-700">
             <div className="flex items-center mb-3">
-              <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center font-bold">
                 {profile?.full_name?.[0]?.toUpperCase() || 'U'}
               </div>
               <div className="ml-3 flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <p className="text-sm font-semibold text-white truncate">
                   {profile?.full_name || 'User'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-white/60 truncate">
                   {profile?.email}
                 </p>
               </div>
@@ -75,13 +75,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex gap-2">
               <button
                 onClick={toggleTheme}
-                className="flex-1 flex items-center justify-center px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 flex items-center justify-center px-3 py-2 text-sm bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
               >
                 {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
               <button
                 onClick={handleSignOut}
-                className="flex-1 flex items-center justify-center px-3 py-2 text-sm bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                className="flex-1 flex items-center justify-center px-3 py-2 text-sm bg-white/10 text-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
               >
                 <LogOut className="w-4 h-4 mr-1" />
                 Sign Out
